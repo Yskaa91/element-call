@@ -69,7 +69,7 @@ let hostBridge: HostBridge;
 
 beforeEach(() => {
   vi.resetAllMocks();
-  downloadMedia = vi.fn().mockResolvedValue(new Blob([new Uint8Array([1])]));
+  downloadMedia = vi.fn().mockResolvedValue(downloadedBlob());
   hostBridge = { ...nullHostBridge, downloadMedia } as HostBridge;
   vi.mocked(decodeAudio).mockResolvedValue({ duration: 1 } as AudioBuffer);
   vi.mocked(createSoundboardClient).mockResolvedValue(makeClient() as never);
@@ -95,7 +95,18 @@ async function openPanel(): Promise<void> {
 }
 
 function soundFile(name = "small.ogg", size = 10): File {
-  return new File([new Uint8Array(size)], name, { type: "audio/ogg" });
+  // jsdom's Blob/File have no arrayBuffer(), so give the file one.
+  return Object.assign(
+    new File([new Uint8Array(size)], name, { type: "audio/ogg" }),
+    { arrayBuffer: async (): Promise<ArrayBuffer> => new ArrayBuffer(8) },
+  ) as unknown as File;
+}
+
+/** A downloaded pad; jsdom's Blob has no arrayBuffer(), so supply one. */
+function downloadedBlob(): Blob {
+  return {
+    arrayBuffer: async (): Promise<ArrayBuffer> => new ArrayBuffer(8),
+  } as unknown as Blob;
 }
 
 describe("SoundboardPanel", () => {
