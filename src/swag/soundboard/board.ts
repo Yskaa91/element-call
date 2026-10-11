@@ -76,6 +76,11 @@ function parseSound(entry: unknown): SoundboardSound | null {
   if (typeof mimetype !== "string") return null;
   if (!isFiniteNumber(size) || size < 0) return null;
   if (!isFiniteNumber(durationMs) || durationMs < 0) return null;
+  // A hostile board entry must not survive parsing just because its numbers
+  // are well-typed: a 50 MB / 10 minute pad is exactly the attack the limits
+  // exist for, and the download/play path trusts what parseBoard returns.
+  if (size > SOUNDBOARD_LIMITS.maxBytes) return null;
+  if (durationMs > SOUNDBOARD_LIMITS.maxDurationMs) return null;
   if (typeof addedBy !== "string") return null;
   if (!isFiniteNumber(addedTs)) return null;
   return { id, name, mxc, mimetype, size, durationMs, addedBy, addedTs };
@@ -84,10 +89,10 @@ function parseSound(entry: unknown): SoundboardSound | null {
 /**
  * Reads a board from an unknown state event content.
  *
- * Never throws: anything that is not a board, and any entry that does not have
- * every field with the right type, is dropped. Names are deliberately not
- * length-checked here — a hostile name must not take the board down, and the
- * UI truncates what it renders.
+ * Never throws: anything that is not a board, any entry that does not have
+ * every field with the right type, and any entry over the byte or duration
+ * limit is dropped. Names are deliberately not length-checked here — a hostile
+ * name must not take the board down, and the UI truncates what it renders.
  */
 export function parseBoard(content: unknown): SoundboardSound[] {
   if (typeof content !== "object" || content === null) return [];

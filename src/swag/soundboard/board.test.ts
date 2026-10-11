@@ -116,6 +116,31 @@ describe("parseBoard", () => {
     expect(board[0].name).toHaveLength(name.length);
   });
 
+  it("drops entries over the byte or duration limit and keeps the rest", () => {
+    const board = parseBoard({
+      version: 1,
+      sounds: [
+        wireSound({ id: "ok" }),
+        wireSound({ id: "huge", size: SOUNDBOARD_LIMITS.maxBytes + 1 }),
+        wireSound({ id: "long", duration_ms: SOUNDBOARD_LIMITS.maxDurationMs + 1 }),
+      ],
+    });
+    expect(board.map((entry) => entry.id)).toEqual(["ok"]);
+  });
+
+  it("keeps entries exactly at the limits", () => {
+    const board = parseBoard({
+      version: 1,
+      sounds: [
+        wireSound({
+          size: SOUNDBOARD_LIMITS.maxBytes,
+          duration_ms: SOUNDBOARD_LIMITS.maxDurationMs,
+        }),
+      ],
+    });
+    expect(board).toHaveLength(1);
+  });
+
   it("caps the board at the pad limit", () => {
     const sounds = Array.from({ length: SOUNDBOARD_LIMITS.maxSounds + 1 }, (_, i) =>
       wireSound({ id: `pad-${i}` }),
