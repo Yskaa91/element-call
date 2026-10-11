@@ -15,11 +15,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      # action-setup reads the exact pnpm version from package.json's
+      # packageManager field; passing it here too is an error.
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-        with:
-          # package.json declares this in packageManager, but state it explicitly
-          # so the check never depends on action-setup reading that field.
-          version: 11.21.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .node-version
