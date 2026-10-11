@@ -15,16 +15,20 @@ jobs:
     env:
       SWAG_TAG: ${{ github.event.inputs.tag || github.ref_name }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      # When dispatched with an explicit tag, build that tag's tree, not the
+      # dispatch ref, so the artifact always matches the release tag.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-pnpmfile
       - run: VITE_APP_VERSION="$SWAG_TAG" NODE_OPTIONS="--max-old-space-size=4096" pnpm build:full
       - name: Record the version the app reports
-        run: grep -rq "$SWAG_TAG" dist/ && echo "marker present in dist"
+        run: grep -rqF "$SWAG_TAG" dist/ && echo "marker present in dist"
       - name: Pack the static release
         run: |
           set -euo pipefail
@@ -33,7 +37,7 @@ jobs:
           cp -a dist/. "pack/$OUT/"
           tar --numeric-owner --transform "s|pack/$OUT|$OUT|" -czf "$OUT.tar.gz" -C pack "$OUT"
           sha256sum "$OUT.tar.gz" > "$OUT.tar.gz.sha256"
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ env.SWAG_TAG }}
           files: |
