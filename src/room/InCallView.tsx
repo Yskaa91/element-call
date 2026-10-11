@@ -649,7 +649,18 @@ export const InCallView: FC<InCallViewProps> = ({
 
   // Only hide the settings button if we have an AppBar header and we are showing the header
   const footer = footerVm !== null && (
-    <CallFooter className={styles.footer} ref={footerRef} vm={footerVm}>
+    <CallFooter
+      className={styles.footer}
+      ref={footerRef}
+      vm={footerVm}
+      // The settings slot is hidden below 500px; this keeps the panel reachable.
+      narrowChildren={
+        <SoundboardPanel
+          roomId={matrixRoom.roomId}
+          testIdPrefix="soundboard-narrow"
+        />
+      }
+    >
       <SoundboardPanel roomId={matrixRoom.roomId} />
     </CallFooter>
   );

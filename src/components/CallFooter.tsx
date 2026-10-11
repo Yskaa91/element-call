@@ -111,12 +111,19 @@ export interface FooterProps {
   className?: string;
   ref?: Ref<HTMLDivElement>;
   children?: JSX.Element | JSX.Element[] | false;
+  /**
+   * Extra controls shown in the centre button group on narrow screens only,
+   * mirroring the narrow-screen settings button. The `children` slot is hidden
+   * below 500px, so anything that must stay reachable needs an entry here.
+   */
+  narrowChildren?: JSX.Element | false;
   vm: ViewModel<FooterSnapshot>;
 }
 export const CallFooter: FC<FooterProps> = ({
   className,
   ref,
   children,
+  narrowChildren,
   vm,
 }) => {
   const asOverlay = useBehavior(vm.asOverlay$);
@@ -162,6 +169,16 @@ export const CallFooter: FC<FooterProps> = ({
         onClick={openSettings}
         data-testid="settings-bottom-center"
       />,
+    );
+  }
+
+  if (narrowChildren) {
+    // The settings slot is hidden below 500px, so features that live there
+    // (the soundboard) also get a narrow-only entry point in the center group.
+    buttons.push(
+      <div key="narrow-children" className={styles.settingsOnlyShowNarrow}>
+        {narrowChildren}
+      </div>,
     );
   }
 
