@@ -45,6 +45,37 @@ export class SoundboardError extends Error {
 }
 
 const UPDATE_STATE_ACTION = `action:${WidgetApiToWidgetAction.UpdateState}`;
+const NOTIFY_CAPABILITIES_ACTION = `action:${WidgetApiToWidgetAction.NotifyCapabilities}`;
+
+/**
+ * How long to wait for the host's capability notification before giving up.
+ *
+ * The renegotiate reply only means the host *received* the request; the
+ * capabilities are actually granted a step later, when the host validates them
+ * and sends `notify_capabilities`. Waiting for that is what stops an immediate
+ * `load()`/`save()` from being refused. The bound keeps a host that never
+ * notifies from hanging the panel forever.
+ */
+const CAPABILITIES_TIMEOUT_MS = 5_000;
+
+/** Resolves when the host next reports the widget's approved capabilities. */
+function waitForCapabilitiesNotification(api: WidgetApi): Promise<void> {
+  return new Promise((resolve) => {
+    const onNotify = (): void => {
+      cleanup();
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, CAPABILITIES_TIMEOUT_MS);
+    const cleanup = (): void => {
+      clearTimeout(timer);
+      api.off(NOTIFY_CAPABILITIES_ACTION, onNotify);
+    };
+    api.on(NOTIFY_CAPABILITIES_ACTION, onNotify);
+  });
+}
 
 /**
  * Reads and writes one space's soundboard through the raw widget API.
@@ -117,7 +148,9 @@ export class SoundboardClient {
  * Finds the space that owns the call room's soundboard.
  *
  * The space room id is the state key of the call room's `m.space.parent`
- * state event. Returns null when the room is in no space.
+ * state event. A room can be in several spaces; the canonical parent
+ * (`content.canonical === true`) wins, falling back to the first parent when
+ * none is marked canonical. Returns null when the room is in no space.
  */
 export async function resolveSpaceRoomId(api: WidgetApi, roomId: string): Promise<string | null> {
   let events: IRoomEvent[];
@@ -126,10 +159,13 @@ export async function resolveSpaceRoomId(api: WidgetApi, roomId: string): Promis
   } catch (cause) {
     throw new SoundboardError("Could not read the room's space parent", cause);
   }
-  for (const event of events) {
-    if (typeof event.state_key === "string" && event.state_key.length > 0) return event.state_key;
-  }
-  return null;
+  const parents = events.filter(
+    (event) => typeof event.state_key === "string" && event.state_key.length > 0,
+  );
+  const canonical = parents.find(
+    (event) => (event.content as { canonical?: unknown } | undefined)?.canonical === true,
+  );
+  return (canonical ?? parents[0])?.state_key ?? null;
 }
 
 /**
@@ -137,7 +173,9 @@ export async function resolveSpaceRoomId(api: WidgetApi, roomId: string): Promis
  *
  * Requesting the space's timeline and the board's state capabilities happens
  * here, once the space room is known, and renegotiates the widget's
- * capabilities (MSC2974) so the host can approve them.
+ * capabilities (MSC2974) so the host can approve them. The returned client only
+ * resolves once the host has actually granted them (its `notify_capabilities`
+ * action), so a `load()` issued straight afterwards is not refused.
  */
 export async function createSoundboardClient(api: WidgetApi, roomId: string): Promise<SoundboardClient | null> {
   const spaceRoomId = await resolveSpaceRoomId(api, roomId);
@@ -146,7 +184,15 @@ export async function createSoundboardClient(api: WidgetApi, roomId: string): Pr
   api.requestCapabilityForRoomTimeline(spaceRoomId);
   api.requestCapabilityToReceiveState(SOUNDBOARD_EVENT_TYPE);
   api.requestCapabilityToSendState(SOUNDBOARD_EVENT_TYPE);
-  await api.updateRequestedCapabilities();
+
+  // Register before asking, so a fast notification is not missed.
+  const capabilitiesGranted = waitForCapabilitiesNotification(api);
+  try {
+    await api.updateRequestedCapabilities();
+  } catch (cause) {
+    throw new SoundboardError("Could not request the soundboard capabilities", cause);
+  }
+  await capabilitiesGranted;
 
   return new SoundboardClient(api, roomId, spaceRoomId);
 }

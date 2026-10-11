@@ -21,6 +21,7 @@ import {
   createSoundboardClient,
   resolveSpaceRoomId,
 } from "./boardClient";
+import { flushPromises } from "../../utils/test.ts";
 
 const ROOM_ID = "!call:example.org";
 const SPACE_ID = "!space:example.org";
@@ -110,6 +111,20 @@ function updateStateEvent(state: IRoomEvent[]): CustomEvent<IWidgetApiRequest> {
     detail: { data: { state } },
     preventDefault: vi.fn(),
   } as unknown as CustomEvent<IWidgetApiRequest>;
+}
+
+const NOTIFY_CAPABILITIES_ACTION = `action:${WidgetApiToWidgetAction.NotifyCapabilities}`;
+
+/**
+ * The host grants capabilities a step after it acknowledges the renegotiate
+ * request, by sending `notify_capabilities`. Emit it so
+ * `createSoundboardClient` can resolve.
+ */
+async function grantCapabilities(api: MockApi): Promise<void> {
+  await flushPromises();
+  const call = api.on.mock.calls.find(([name]) => name === NOTIFY_CAPABILITIES_ACTION);
+  expect(call, "the client must wait for notify_capabilities").toBeDefined();
+  (call![1] as () => void)();
 }
 
 describe("SoundboardClient.load", () => {
@@ -262,6 +277,28 @@ describe("resolveSpaceRoomId", () => {
     expect(api.readStateEvents).toHaveBeenCalledWith(EventType.SpaceParent, undefined, undefined, [ROOM_ID]);
   });
 
+  it("prefers the canonical parent over the first one", async () => {
+    const api = mockApi();
+    const nonCanonical: IRoomEvent = {
+      ...spaceParentEvent(),
+      state_key: "!other:example.org",
+      content: { via: ["example.org"] },
+    };
+    // The canonical parent comes second, so ordering alone would pick the wrong one.
+    api.readStateEvents.mockResolvedValue([nonCanonical, spaceParentEvent()]);
+
+    await expect(resolveSpaceRoomId(api, ROOM_ID)).resolves.toBe(SPACE_ID);
+  });
+
+  it("falls back to the first parent when none is canonical", async () => {
+    const api = mockApi();
+    api.readStateEvents.mockResolvedValue([
+      { ...spaceParentEvent(), content: { via: ["example.org"] } },
+    ]);
+
+    await expect(resolveSpaceRoomId(api, ROOM_ID)).resolves.toBe(SPACE_ID);
+  });
+
   it("returns null when the room has no space parent", async () => {
     const api = mockApi();
     api.readStateEvents.mockResolvedValue([]);
@@ -283,7 +320,9 @@ describe("createSoundboardClient", () => {
     const api = mockApi();
     api.readStateEvents.mockResolvedValue([spaceParentEvent()]);
 
-    const client = await createSoundboardClient(api, ROOM_ID);
+    const pending = createSoundboardClient(api, ROOM_ID);
+    await grantCapabilities(api);
+    const client = await pending;
 
     expect(client).toBeInstanceOf(SoundboardClient);
     expect(client?.spaceRoomId).toBe(SPACE_ID);
@@ -291,5 +330,28 @@ describe("createSoundboardClient", () => {
     expect(api.requestCapabilityToReceiveState).toHaveBeenCalledWith(SOUNDBOARD_EVENT_TYPE);
     expect(api.requestCapabilityToSendState).toHaveBeenCalledWith(SOUNDBOARD_EVENT_TYPE);
     expect(api.updateRequestedCapabilities).toHaveBeenCalled();
+  });
+
+  it("only resolves once the host has granted the capabilities", async () => {
+    const api = mockApi();
+    api.readStateEvents.mockResolvedValue([spaceParentEvent()]);
+
+    let resolved = false;
+    const pending = createSoundboardClient(api, ROOM_ID).then((client) => {
+      resolved = true;
+      return client;
+    });
+
+    // The renegotiate reply alone is not enough: the host grants a step later.
+    await flushPromises();
+    expect(resolved).toBe(false);
+
+    await grantCapabilities(api);
+    const client = await pending;
+    expect(resolved).toBe(true);
+
+    // A load issued straight after creation must not be refused.
+    api.readStateEvents.mockResolvedValue([boardEvent()]);
+    await expect(client!.load()).resolves.toEqual([SOUND]);
   });
 });
