@@ -12,6 +12,7 @@ in the same commit as the anchor. Rebases should conflict here, and in the ancho
 | `src/widget.ts` | `{ eventType: EventType.SpaceParent }` added to `receiveState`                                                             | The soundboard's space room is the state key of the call room's `m.space.parent` event, so the widget has to be allowed to receive it.                    |
 | `src/widget.ts` | `api.requestCapability(MatrixCapabilities.MSC4039UploadFile)`                                                              | Pad audio is uploaded to the media repository through the widget API; Element Call had no code calling `uploadFile` before.                              |
 | `src/widget.ts` | `api.requestCapabilityForRoomTimeline(roomId)` and `api.requestCapabilityToReceiveState(EventType.SpaceParent)`             | The raw widget API only reads state for rooms whose timeline it has been granted, and the space parent lives in the call's own room.                     |
+| `src/state/CallViewModel/localMember/Publisher.ts` | `observeSoundboardProcessor(this.scope, room, this.logger)` in the constructor (plus its import) | Mixes soundboard pads into the outgoing microphone track, so every other participant hears them, including while the sender is muted. The plumbing lives in `src/swag/soundboard/observeSoundboardProcessor.ts`; the Publisher only calls it, and the UI reads the processor through `src/swag/soundboard/processorHandle.ts`.
 
 The space room's own timeline and the board's state capabilities are requested from
 `src/swag/soundboard/boardClient.ts` once `m.space.parent` has been read, and renegotiated with
@@ -19,3 +20,7 @@ The space room's own timeline and the board's state capabilities are requested f
 
 The board module (`src/swag/soundboard/board.ts`) and the check workflow
 (`.github/workflows/swag-check.yaml`) add no anchor.
+
+`src/state/CallViewModel/localMember/Publisher.test.ts` is a test, not an anchor: it gained a
+`createMockAudioTrack` helper and a `soundboard processor` describe so the check workflow exercises
+the install/remove wiring. The workflow's unit-test step was widened to run that file.

@@ -33,6 +33,7 @@ import {
 import { observeTrackReference$ } from "../../observeTrackReference";
 import { type Connection } from "../remoteMembers/Connection.ts";
 import { ObservableScope } from "../../ObservableScope.ts";
+import { observeSoundboardProcessor } from "../../../swag/soundboard/observeSoundboardProcessor.ts";
 
 /**
  * A wrapper for a Connection object.
@@ -75,6 +76,8 @@ export class Publisher {
 
     // Setup track processor syncing (blur)
     this.observeTrackProcessors(this.scope, room, trackerProcessorState$);
+    // Mix soundboard pads into the microphone track (src/swag/soundboard)
+    observeSoundboardProcessor(this.scope, room, this.logger);
     // Observe media device changes and update LiveKit active devices accordingly
     this.observeMediaDevices(this.scope, devices, controlledAudioDevices);
 
