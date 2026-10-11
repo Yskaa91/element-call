@@ -200,17 +200,23 @@ describe("Publisher", () => {
     await publisher.destroy();
   });
 
-  it("Should not create tracks if started muted to avoid unneeded permission requests", async () => {
-    const createTracksSpy = vi.spyOn(
-      connection.livekitRoom.localParticipant,
-      "createTracks",
-    );
-
+  it("creates a muted microphone track when joining muted", async () => {
+    // The soundboard needs a published microphone track even when muted, so a
+    // pad can be mixed into it and heard by others.
     audioEnabled$.next(false);
     videoEnabled$.next(false);
     await publisher.createAndSetupTracks();
+    await flushPromises();
 
-    expect(createTracksSpy).not.toHaveBeenCalled();
+    expect(localParticipant.createTracks).toHaveBeenCalledWith({
+      audio: true,
+      video: undefined,
+    });
+    const track = localParticipant.getTrackPublication(
+      Track.Source.Microphone,
+    )?.track;
+    expect(track).toBeDefined();
+    await vi.waitFor(() => expect(track!.isMuted).toBe(true));
   });
 
   it("should unsetHandler and stop tracks on destroy", async () => {

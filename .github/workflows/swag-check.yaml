@@ -25,6 +25,6 @@ jobs:
       # ignore-pnpmfile should never be committed; CI must crash if it happened.
       - run: pnpm install --frozen-lockfile --ignore-pnpmfile
       - name: Unit tests
-        run: pnpm exec vitest run --project unit src/swag src/widget.test.ts
+        run: pnpm exec vitest run --project unit src/swag src/widget.test.ts src/state/CallViewModel/localMember/Publisher.test.ts src/components/CallFooter.test.tsx
       - name: Type-check
         run: pnpm run lint:types
