@@ -8,7 +8,6 @@ Please see LICENSE in the repository root for full details.
 import { afterEach, beforeEach, describe, expect, it, test, vi } from "vitest";
 import {
   ConnectionState as LivekitConnectionState,
-  LocalAudioTrack,
   LocalParticipant,
   type LocalTrack,
   type LocalTrackPublication,
@@ -28,11 +27,6 @@ import {
 import { Publisher } from "./Publisher";
 import { type Connection } from "../remoteMembers/Connection";
 import { type MuteStates } from "../../MuteStates";
-import { SoundboardAudioProcessor } from "../../../swag/soundboard/SoundboardAudioProcessor";
-import {
-  setSoundboardProcessor,
-  soundboardProcessor$,
-} from "../../../swag/soundboard/processorHandle";
 
 let scope: ObservableScope;
 
@@ -41,10 +35,6 @@ beforeEach(() => {
 });
 
 afterEach(() => scope.end());
-
-// The soundboard processor handle is module-level, so a test that installs one
-// must not leak it into the next.
-afterEach(() => setSoundboardProcessor(null));
 
 function createMockLocalTrack(source: Track.Source): LocalTrack {
   const track = {
@@ -68,22 +58,6 @@ function createMockLocalTrack(source: Track.Source): LocalTrack {
     track.isUpstreamPaused = false;
   });
 
-  return track;
-}
-
-/**
- * A microphone track that passes the `instanceof LocalAudioTrack` check the
- * soundboard wiring uses, and carries the processor methods the real class
- * has. (The plain mock above is not a LocalAudioTrack, so the wiring leaves it
- * alone.)
- */
-function createMockAudioTrack(): LocalTrack {
-  const track = createMockLocalTrack(Track.Source.Microphone);
-  Object.setPrototypeOf(track, LocalAudioTrack.prototype);
-  Object.assign(track, {
-    setProcessor: vi.fn().mockResolvedValue(undefined),
-    stopProcessor: vi.fn().mockResolvedValue(undefined),
-  });
   return track;
 }
 
@@ -168,7 +142,7 @@ beforeEach(() => {
     .mockImplementation(async (opts) => {
       const tracks: LocalTrack[] = [];
       if (opts.audio) {
-        tracks.push(createMockAudioTrack());
+        tracks.push(createMockLocalTrack(Track.Source.Microphone));
       }
       if (opts.video) {
         tracks.push(createMockLocalTrack(Track.Source.Camera));
@@ -367,51 +341,6 @@ describe("Publisher", () => {
         audio: mutes.audioEnabled ? true : undefined,
         video: mutes.videoEnabled ? true : undefined,
       });
-    });
-  });
-
-  describe("soundboard processor", () => {
-    it("installs the soundboard processor on the microphone track", async () => {
-      audioEnabled$.next(true);
-      await publisher.createAndSetupTracks();
-      await flushPromises();
-
-      const track = localParticipant.getTrackPublication(
-        Track.Source.Microphone,
-      )?.track;
-      expect(track).toBeDefined();
-      expect(
-        (track as unknown as { setProcessor: ReturnType<typeof vi.fn> })
-          .setProcessor,
-      ).toHaveBeenCalledOnce();
-      expect(soundboardProcessor$.value).toBeInstanceOf(
-        SoundboardAudioProcessor,
-      );
-    });
-
-    it("clears the handle and stops the processor when the track is unpublished", async () => {
-      audioEnabled$.next(true);
-      await publisher.createAndSetupTracks();
-      await flushPromises();
-
-      const track = localParticipant.getTrackPublication(
-        Track.Source.Microphone,
-      )?.track;
-      const publication = trackPublications.find(
-        (pub) => pub.track === track,
-      )!;
-      trackPublications.length = 0;
-      localParticipant.emit(
-        ParticipantEvent.LocalTrackUnpublished,
-        publication,
-      );
-      await flushPromises();
-
-      expect(soundboardProcessor$.value).toBeNull();
-      expect(
-        (track as unknown as { stopProcessor: ReturnType<typeof vi.fn> })
-          .stopProcessor,
-      ).toHaveBeenCalledOnce();
     });
   });
 
