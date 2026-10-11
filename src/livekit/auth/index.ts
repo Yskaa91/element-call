@@ -170,6 +170,9 @@ export async function delegateDelayedLeave({
   delayId,
   logger,
 }: DelegateDelayedLeaveParams): Promise<void> {
+  // It's important that we use the same flow (CS API or OpenID) as whatever we
+  // would've used to get a JWT token for this transport, since the participant
+  // identity computed by the service needs to match.
   if ("url" in transport) {
     try {
       await csApi.delegateDelayedLeave({
