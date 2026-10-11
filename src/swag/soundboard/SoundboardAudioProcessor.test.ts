@@ -151,17 +151,49 @@ describe("SoundboardAudioProcessor", () => {
     expect(padSource.start).toHaveBeenCalledOnce();
   });
 
-  it("plays a pad at unity gain by default", async () => {
+  it("plays a pad at the default gain when none is given", async () => {
     const processor = new SoundboardAudioProcessor();
     await processor.init(initOptions(context));
     processor.playPad(padBuffer());
-    expect(gainOf(context, 1).gain.value).toBe(1);
+    expect(gainOf(context, 1).gain.value).toBe(0.8);
   });
 
   it("does nothing when a pad is played before init", () => {
     const processor = new SoundboardAudioProcessor();
     expect(() => processor.playPad(padBuffer())).not.toThrow();
     expect(context.createBufferSource).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when a pad is played after destroy", async () => {
+    const processor = new SoundboardAudioProcessor();
+    await processor.init(initOptions(context));
+    await processor.destroy();
+
+    expect(() => processor.playPad(padBuffer())).not.toThrow();
+    expect(context.createBufferSource).not.toHaveBeenCalled();
+  });
+
+  it("plays at most three pads at once", async () => {
+    const processor = new SoundboardAudioProcessor();
+    await processor.init(initOptions(context));
+
+    for (let i = 0; i < 5; i++) processor.playPad(padBuffer());
+
+    expect(context.createBufferSource).toHaveBeenCalledTimes(3);
+  });
+
+  it("allows a new pad once an earlier one has ended", async () => {
+    const processor = new SoundboardAudioProcessor();
+    await processor.init(initOptions(context));
+
+    processor.playPad(padBuffer());
+    processor.playPad(padBuffer());
+    processor.playPad(padBuffer());
+    bufferSourceOf(context, 0).onended?.();
+
+    processor.playPad(padBuffer());
+
+    expect(context.createBufferSource).toHaveBeenCalledTimes(4);
   });
 
   it("stops and disconnects every pad on stopAllPads", async () => {
@@ -238,17 +270,5 @@ describe("SoundboardAudioProcessor", () => {
     expect(destination.disconnect).toHaveBeenCalled();
     expect(processed.stop).toHaveBeenCalledOnce();
     expect(processor.processedTrack).toBeUndefined();
-  });
-
-  it("sets the microphone gain, ignoring non-finite values", async () => {
-    const processor = new SoundboardAudioProcessor();
-    await processor.init(initOptions(context));
-    const micGain = gainOf(context);
-
-    processor.setMicGain(0.25);
-    expect(micGain.gain.value).toBe(0.25);
-
-    processor.setMicGain(Number.NaN);
-    expect(micGain.gain.value).toBe(0.25);
   });
 });

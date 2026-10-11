@@ -10,8 +10,10 @@ import {
   type FC,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { IconButton, Tooltip } from "@vector-im/compound-web";
 import {
   AudioIcon,
@@ -30,6 +32,7 @@ import {
 } from "./board";
 import { createSoundboardClient, type SoundboardClient } from "./boardClient";
 import { decodeAudio } from "./decodeAudio";
+import { DEFAULT_PAD_GAIN } from "./SoundboardAudioProcessor";
 import { soundboardProcessor$ } from "./processorHandle";
 import { useSoundboardWidget } from "./SoundboardWidgetContext";
 import styles from "./SoundboardPanel.module.css";
@@ -37,6 +40,12 @@ import styles from "./SoundboardPanel.module.css";
 export interface SoundboardPanelProps {
   /** The call room whose space owns the board. */
   roomId: string;
+  /**
+   * Prefix for the panel's `data-testid`s. The panel is rendered twice — once
+   * in the wide footer slot and once in the narrow centre group — so the two
+   * instances need distinct ids.
+   */
+  testIdPrefix?: string;
 }
 
 const MAX_NAME_LENGTH = 40;
@@ -65,17 +74,28 @@ function newId(): string {
  * Publisher installs (see `processorHandle.ts`). The panel hides itself when
  * Element Call is not a widget, and when the call room has no space parent.
  */
-export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
+export const SoundboardPanel: FC<SoundboardPanelProps> = ({
+  roomId,
+  testIdPrefix = "soundboard",
+}) => {
   const widget = useSoundboardWidget();
   const hostBridge = useHostBridge();
   const { client: matrixClient } = useClient();
   const processor = useBehavior(soundboardProcessor$);
+  const { t } = useTranslation();
 
   const [client, setClient] = useState<SoundboardClient | null>(null);
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [sounds, setSounds] = useState<SoundboardSound[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [padGain, setPadGain] = useState(DEFAULT_PAD_GAIN);
+  const [playingIds, setPlayingIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+
+  // Decoded buffers, so a repeated trigger does not re-download and re-decode.
+  const buffers = useRef(new Map<string, AudioBuffer>());
 
   useEffect(() => {
     if (widget === null) return;
@@ -88,7 +108,7 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
         const board = await soundboard.load();
         if (!cancelled) setSounds(board);
       } catch (e) {
-        if (!cancelled) setError(messageOf(e, "Could not read the soundboard"));
+        if (!cancelled) setError(messageOf(e, t("soundboard.read_failed")));
       }
     };
 
@@ -103,7 +123,7 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(messageOf(e, "Could not reach the soundboard"));
+        setError(messageOf(e, t("soundboard.reach_failed")));
         setVisible(true);
       });
 
@@ -111,34 +131,54 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [widget, roomId]);
+  }, [widget, roomId, t]);
+
+  // Closing the panel stops anything it started.
+  useEffect(() => {
+    if (!open) processor?.stopAllPads();
+  }, [open, processor]);
 
   const download = useCallback(
     async (mxc: string): Promise<Blob> => {
       if (!hostBridge.downloadMedia) {
-        throw new Error("This host cannot download sounds");
+        throw new Error(t("soundboard.download_unsupported"));
       }
       return hostBridge.downloadMedia(mxc);
     },
-    [hostBridge],
+    [hostBridge, t],
   );
 
   const play = useCallback(
     async (sound: SoundboardSound): Promise<void> => {
       setError(null);
       if (processor === null) {
-        setError("The microphone is not ready yet");
+        setError(t("soundboard.microphone_not_ready"));
         return;
       }
       try {
-        const blob = await download(sound.mxc);
-        const buffer = await decodeAudio(await blob.arrayBuffer());
-        processor.playPad(buffer);
+        let buffer = buffers.current.get(sound.mxc);
+        if (buffer === undefined) {
+          const blob = await download(sound.mxc);
+          buffer = await decodeAudio(await blob.arrayBuffer());
+          buffers.current.set(sound.mxc, buffer);
+        }
+        processor.playPad(buffer, padGain);
+
+        // A transient "playing" marker, so a trigger does not look like a no-op.
+        setPlayingIds((previous) => new Set(previous).add(sound.id));
+        const duration = Number.isFinite(buffer.duration) ? buffer.duration : 0;
+        window.setTimeout(() => {
+          setPlayingIds((previous) => {
+            const next = new Set(previous);
+            next.delete(sound.id);
+            return next;
+          });
+        }, Math.max(300, duration * 1000));
       } catch (e) {
-        setError(messageOf(e, "Could not play the sound"));
+        setError(messageOf(e, t("soundboard.play_failed")));
       }
     },
-    [processor, download],
+    [processor, download, padGain, t],
   );
 
   const deletePad = useCallback(
@@ -150,10 +190,10 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
         await client.save(next);
         setSounds(next);
       } catch (e) {
-        setError(messageOf(e, "Could not save the soundboard"));
+        setError(messageOf(e, t("soundboard.save_failed")));
       }
     },
-    [client, sounds],
+    [client, sounds, t],
   );
 
   const addFile = useCallback(
@@ -169,7 +209,7 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
         return;
       }
       if (sounds.length >= SOUNDBOARD_LIMITS.maxSounds) {
-        setError("The soundboard is full");
+        setError(t("soundboard.full"));
         return;
       }
 
@@ -197,10 +237,10 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
         await client.save(next);
         setSounds(next);
       } catch (e) {
-        setError(messageOf(e, "Could not add the sound"));
+        setError(messageOf(e, t("soundboard.add_failed")));
       }
     },
-    [client, sounds, matrixClient],
+    [client, sounds, matrixClient, t],
   );
 
   const onFileChange = useCallback(
@@ -217,35 +257,42 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
 
   return (
     <div className={styles.container}>
-      <Tooltip label="Soundboard">
+      <Tooltip label={t("soundboard.title")}>
         <IconButton
           kind={open ? "primary" : "secondary"}
-          aria-label="Soundboard"
+          aria-label={t("soundboard.title")}
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
-          data-testid="soundboard-toggle"
+          data-testid={`${testIdPrefix}-toggle`}
         >
           <AudioIcon aria-hidden />
         </IconButton>
       </Tooltip>
       {open && (
-        <div
-          className={styles.panel}
-          role="dialog"
-          aria-label="Soundboard"
-          data-testid="soundboard-panel"
-        >
+        <div className={styles.panel} data-testid={`${testIdPrefix}-panel`}>
           {error !== null && (
             <p
               className={styles.error}
               role="alert"
-              data-testid="soundboard-error"
+              data-testid={`${testIdPrefix}-error`}
             >
               {error}
             </p>
           )}
+          <label className={styles.gain}>
+            <span>{t("soundboard.volume")}</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={padGain}
+              onChange={(event) => setPadGain(Number(event.target.value))}
+              data-testid={`${testIdPrefix}-gain`}
+            />
+          </label>
           {sounds.length === 0 ? (
-            <p className={styles.empty}>No sounds yet</p>
+            <p className={styles.empty}>{t("soundboard.empty")}</p>
           ) : (
             <ul className={styles.pads}>
               {sounds.map((sound) => (
@@ -253,16 +300,19 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
                   <button
                     type="button"
                     className={styles.padButton}
+                    data-playing={String(playingIds.has(sound.id))}
                     onClick={() => void play(sound)}
-                    data-testid={`soundboard-pad-${sound.id}`}
+                    data-testid={`${testIdPrefix}-pad-${sound.id}`}
                   >
                     {displayName(sound.name)}
                   </button>
                   <IconButton
                     kind="secondary"
-                    aria-label={`Delete ${displayName(sound.name)}`}
+                    aria-label={t("soundboard.delete", {
+                      name: displayName(sound.name),
+                    })}
                     onClick={() => void deletePad(sound.id)}
-                    data-testid={`soundboard-delete-${sound.id}`}
+                    data-testid={`${testIdPrefix}-delete-${sound.id}`}
                   >
                     <DeleteIcon aria-hidden />
                   </IconButton>
@@ -275,9 +325,9 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({ roomId }) => {
               type="file"
               accept="audio/*"
               onChange={onFileChange}
-              data-testid="soundboard-file"
+              data-testid={`${testIdPrefix}-file`}
             />
-            Add sound
+            {t("soundboard.add")}
           </label>
         </div>
       )}

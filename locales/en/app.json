@@ -249,6 +249,21 @@
     "resolution_label": "Resolution",
     "screen_share_header": "Screen sharing"
   },
+  "soundboard": {
+    "add": "Add sound",
+    "add_failed": "Could not add the sound",
+    "delete": "Delete {{name}}",
+    "download_unsupported": "This host cannot download sounds",
+    "empty": "No sounds yet",
+    "full": "The soundboard is full",
+    "microphone_not_ready": "The microphone is not ready yet",
+    "play_failed": "Could not play the sound",
+    "read_failed": "Could not read the soundboard",
+    "reach_failed": "Could not reach the soundboard",
+    "save_failed": "Could not save the soundboard",
+    "title": "Soundboard",
+    "volume": "Pad volume"
+  },
   "star_rating_input_label_one": "{{count}} star",
   "star_rating_input_label_other": "{{count}} stars",
   "start_new_call": "Start new call",

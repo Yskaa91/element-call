@@ -51,6 +51,23 @@
   white-space: nowrap;
 }
 
+/* A pad that has just been triggered, so a click does not look like a no-op. */
+.padButton[data-playing="true"] {
+  outline: 2px solid var(--cpd-color-border-focused, #0a84ff);
+  outline-offset: 1px;
+}
+
+.gain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.gain input {
+  flex: 1;
+}
+
 .add {
   display: block;
 }

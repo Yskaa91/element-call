@@ -6,7 +6,7 @@ Please see LICENSE in the repository root for full details.
 */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TooltipProvider } from "@vector-im/compound-web";
 import { type WidgetApi } from "matrix-widget-api";
@@ -62,7 +62,10 @@ function makeClient(overrides: Partial<FakeClient> = {}): FakeClient {
   };
 }
 
-const processor = { playPad: vi.fn() } as unknown as SoundboardAudioProcessor;
+const processor = {
+  playPad: vi.fn(),
+  stopAllPads: vi.fn(),
+} as unknown as SoundboardAudioProcessor;
 
 let downloadMedia: ReturnType<typeof vi.fn>;
 let hostBridge: HostBridge;
@@ -118,7 +121,7 @@ describe("SoundboardPanel", () => {
     );
   });
 
-  it("plays a pad exactly once with the decoded buffer", async () => {
+  it("plays a pad exactly once with the decoded buffer at the default gain", async () => {
     const buffer = { duration: 1 } as AudioBuffer;
     vi.mocked(decodeAudio).mockResolvedValue(buffer);
     renderPanel();
@@ -127,8 +130,49 @@ describe("SoundboardPanel", () => {
     await userEvent.click(screen.getByTestId("soundboard-pad-one"));
 
     await waitFor(() => expect(processor.playPad).toHaveBeenCalledTimes(1));
-    expect(processor.playPad).toHaveBeenCalledWith(buffer);
+    expect(processor.playPad).toHaveBeenCalledWith(buffer, 0.8);
     expect(downloadMedia).toHaveBeenCalledWith(SOUND.mxc);
+  });
+
+  it("marks a pad as playing when it is triggered", async () => {
+    renderPanel();
+    await openPanel();
+
+    await userEvent.click(screen.getByTestId("soundboard-pad-one"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("soundboard-pad-one")).toHaveAttribute(
+        "data-playing",
+        "true",
+      ),
+    );
+  });
+
+  it("downloads and decodes a pad once, then reuses the buffer", async () => {
+    renderPanel();
+    await openPanel();
+
+    await userEvent.click(screen.getByTestId("soundboard-pad-one"));
+    await waitFor(() => expect(processor.playPad).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByTestId("soundboard-pad-one"));
+    await waitFor(() => expect(processor.playPad).toHaveBeenCalledTimes(2));
+
+    expect(downloadMedia).toHaveBeenCalledTimes(1);
+    expect(decodeAudio).toHaveBeenCalledTimes(1);
+  });
+
+  it("plays pads at the gain chosen in the panel", async () => {
+    renderPanel();
+    await openPanel();
+
+    fireEvent.change(screen.getByTestId("soundboard-gain"), {
+      target: { value: "0.5" },
+    });
+    await userEvent.click(screen.getByTestId("soundboard-pad-one"));
+
+    await waitFor(() =>
+      expect(processor.playPad).toHaveBeenCalledWith(expect.anything(), 0.5),
+    );
   });
 
   it("rejects an over-size file with the limit reason and never uploads it", async () => {

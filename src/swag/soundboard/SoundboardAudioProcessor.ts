@@ -28,6 +28,13 @@ import type {
  * LiveKit's mute only disables the *source* microphone track, so the mixed
  * output keeps streaming while the user appears muted: pads stay audible.
  */
+
+/** The gain a pad plays at when the caller does not pick one. */
+export const DEFAULT_PAD_GAIN = 0.8;
+
+/** How many pads may play at once; further triggers are ignored. */
+const MAX_CONCURRENT_PADS = 3;
+
 export class SoundboardAudioProcessor
   implements TrackProcessor<Track.Kind.Audio, AudioProcessorOptions>
 {
@@ -87,12 +94,15 @@ export class SoundboardAudioProcessor
    * Plays one pad into the outgoing mix.
    *
    * Does nothing before {@link init} or after {@link destroy}: with no graph
-   * there is nothing to mix into. The UI checks for the processor itself.
+   * there is nothing to mix into. The UI checks for the processor itself. At
+   * most {@link MAX_CONCURRENT_PADS} pads play at once; further triggers are
+   * dropped so a user cannot flood the call.
    */
-  public playPad(buffer: AudioBuffer, gain = 1): void {
+  public playPad(buffer: AudioBuffer, gain: number = DEFAULT_PAD_GAIN): void {
     const context = this.audioContext;
     const destination = this.destination;
     if (!context || !destination) return;
+    if (this.pads.size >= MAX_CONCURRENT_PADS) return;
 
     const source = context.createBufferSource();
     source.buffer = buffer;
@@ -113,12 +123,6 @@ export class SoundboardAudioProcessor
       pad.source.stop();
       this.disconnectPad(pad);
     }
-  }
-
-  /** Sets how loud the microphone is in the mix. */
-  public setMicGain(value: number): void {
-    if (!Number.isFinite(value)) return;
-    if (this.micGain) this.micGain.gain.value = Math.max(0, value);
   }
 
   private disconnectPad(pad: {
