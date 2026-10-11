@@ -95,6 +95,14 @@ export const initializeWidget = (
       const api = new WidgetApi(widgetId, parentOrigin);
       api.requestCapability(MatrixCapabilities.AlwaysOnScreen);
       api.requestCapability(MatrixCapabilities.MSC4039DownloadFile);
+      // The soundboard reads the board from the space room and uploads pad
+      // audio to the media repository. The space room id is only known once
+      // the call room's m.space.parent has been read, so the space's timeline
+      // and the board's state capabilities are requested later, in
+      // src/swag/soundboard/boardClient.ts.
+      api.requestCapability(MatrixCapabilities.MSC4039UploadFile);
+      api.requestCapabilityForRoomTimeline(roomId);
+      api.requestCapabilityToReceiveState(EventType.SpaceParent);
 
       // Set up the lazy action emitter, but only for select actions that we
       // intend for the app to handle
@@ -148,6 +156,9 @@ export const initializeWidget = (
         { eventType: EventType.RoomMember },
         { eventType: EventType.RoomEncryption },
         { eventType: EventType.GroupCallMemberPrefix },
+        // The soundboard's space room is the state key of this room's
+        // m.space.parent event.
+        { eventType: EventType.SpaceParent },
       ];
 
       const sendRecvToDevice = [
