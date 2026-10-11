@@ -1,0 +1,56 @@
+.container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 1;
+  width: min(320px, 80vw);
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--cpd-color-bg-subtle-primary, #fff);
+  box-shadow: var(--cpd-shadow-elevated, 0 2px 12px rgb(0 0 0 / 20%));
+  color: var(--cpd-color-text-primary, #111);
+}
+
+.error {
+  margin: 0 0 8px;
+  color: var(--cpd-color-text-critical-primary, #c00);
+}
+
+.empty {
+  margin: 0 0 8px;
+}
+
+.pads {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.pad {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.padButton {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add {
+  display: block;
+}

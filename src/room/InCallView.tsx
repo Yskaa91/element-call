@@ -91,6 +91,7 @@ import { type DeveloperSettingsSnapshot } from "../settings/DeveloperSettingsTab
 import { type ViewModel } from "../state/ViewModel.ts";
 import { RingingStatus } from "../tile/RingingStatus.tsx";
 import { RingingAudioRenderer } from "./RingingAudioRenderer.tsx";
+import { SoundboardPanel } from "../swag/soundboard/SoundboardPanel.tsx";
 
 declare module "react" {
   interface CSSProperties {
@@ -648,7 +649,9 @@ export const InCallView: FC<InCallViewProps> = ({
 
   // Only hide the settings button if we have an AppBar header and we are showing the header
   const footer = footerVm !== null && (
-    <CallFooter className={styles.footer} ref={footerRef} vm={footerVm} />
+    <CallFooter className={styles.footer} ref={footerRef} vm={footerVm}>
+      <SoundboardPanel roomId={matrixRoom.roomId} />
+    </CallFooter>
   );
   const allConnections = useBehavior(vm.allConnections$);
 

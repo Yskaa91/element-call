@@ -54,6 +54,7 @@ import {
 } from "./HostBridge";
 import { useInitial } from "./useInitial";
 import { LeaveToHomeProvider } from "./LeaveToHomeContext";
+import { SoundboardWidgetProvider } from "./swag/soundboard/SoundboardWidgetContext.tsx";
 
 const SentryRoute = Sentry.withSentryReactRouterV7Routing(Route);
 
@@ -176,7 +177,11 @@ export const App: FC<Props> = ({ vm, widget }) => {
                 <ThemeProvider>
                   <TooltipProvider>
                     <Suspense fallback={null}>
-                      <MaybeAppBar>{content}</MaybeAppBar>
+                      <MaybeAppBar>
+                        <SoundboardWidgetProvider widget={widget}>
+                          {content}
+                        </SoundboardWidgetProvider>
+                      </MaybeAppBar>
                     </Suspense>
                   </TooltipProvider>
                 </ThemeProvider>
