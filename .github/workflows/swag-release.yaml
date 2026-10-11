@@ -1,0 +1,41 @@
+name: swag release
+on:
+  push:
+    tags: ["v*-swag.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build (e.g. v0.26.1-swag.1)
+        required: true
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      SWAG_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-pnpmfile
+      - run: VITE_APP_VERSION="$SWAG_TAG" NODE_OPTIONS="--max-old-space-size=4096" pnpm build:full
+      - name: Record the version the app reports
+        run: grep -rq "$SWAG_TAG" dist/ && echo "marker present in dist"
+      - name: Pack the static release
+        run: |
+          set -euo pipefail
+          OUT="element-call-$SWAG_TAG"
+          mkdir -p "pack/$OUT"
+          cp -a dist/. "pack/$OUT/"
+          tar --numeric-owner --transform "s|pack/$OUT|$OUT|" -czf "$OUT.tar.gz" -C pack "$OUT"
+          sha256sum "$OUT.tar.gz" > "$OUT.tar.gz.sha256"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.SWAG_TAG }}
+          files: |
+            element-call-*.tar.gz
+            element-call-*.tar.gz.sha256
