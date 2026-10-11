@@ -17,7 +17,7 @@ import {
 import { logger } from "matrix-js-sdk/lib/logger";
 
 import { ObservableScope } from "../../state/ObservableScope.ts";
-import { flushPromises } from "../../utils/test.ts";
+import { flushPromises, mockEmitter } from "../../utils/test.ts";
 import { SoundboardAudioProcessor } from "./SoundboardAudioProcessor.ts";
 import { observeSoundboardProcessor } from "./observeSoundboardProcessor.ts";
 import { setSoundboardProcessor, soundboardProcessor$ } from "./processorHandle.ts";
@@ -35,18 +35,19 @@ function fakeAudioTrack(): LocalAudioTrack {
   }) as unknown as LocalAudioTrack;
 }
 
+/**
+ * A participant backed by a real event emitter, so the wiring is exercised
+ * through the same `ParticipantEvent`s the SDK emits rather than a hand-rolled
+ * handler map. `getTrackPublication` is read on every event, mirroring the SDK.
+ */
 function fakeParticipant(): {
   participant: LocalParticipant;
   emit: (event: ParticipantEvent) => void;
   setPublication: (publication: LocalTrackPublication | undefined) => void;
 } {
-  const handlers = new Map<ParticipantEvent, () => void>();
   let publication: LocalTrackPublication | undefined;
   const participant = {
-    on: vi.fn((event: ParticipantEvent, handler: () => void) => {
-      handlers.set(event, handler);
-    }),
-    off: vi.fn(),
+    ...mockEmitter(),
     getTrackPublication: vi.fn(() => publication),
     isMicrophoneEnabled: true,
     isCameraEnabled: false,
@@ -55,7 +56,11 @@ function fakeParticipant(): {
 
   return {
     participant,
-    emit: (event) => handlers.get(event)?.(),
+    emit: (event) => {
+      (participant as unknown as { emit: (e: ParticipantEvent) => void }).emit(
+        event,
+      );
+    },
     setPublication: (next) => {
       publication = next;
     },
@@ -67,6 +72,10 @@ function publicationFor(track: LocalAudioTrack): LocalTrackPublication {
     track,
     source: Track.Source.Microphone,
   } as unknown as LocalTrackPublication;
+}
+
+function roomWith(participant: LocalParticipant): LivekitRoom {
+  return { localParticipant: participant } as unknown as LivekitRoom;
 }
 
 let scope: ObservableScope;
@@ -85,9 +94,8 @@ describe("observeSoundboardProcessor", () => {
     const track = fakeAudioTrack();
     const { participant, setPublication } = fakeParticipant();
     setPublication(publicationFor(track));
-    const room = { localParticipant: participant } as unknown as LivekitRoom;
 
-    observeSoundboardProcessor(scope, room, logger);
+    observeSoundboardProcessor(scope, roomWith(participant), logger);
     await flushPromises();
 
     expect(
@@ -101,13 +109,14 @@ describe("observeSoundboardProcessor", () => {
     const track = fakeAudioTrack();
     const { participant, emit, setPublication } = fakeParticipant();
     setPublication(publicationFor(track));
-    const room = { localParticipant: participant } as unknown as LivekitRoom;
 
-    observeSoundboardProcessor(scope, room, logger);
+    observeSoundboardProcessor(scope, roomWith(participant), logger);
     await flushPromises();
     expect(soundboardProcessor$.value).not.toBeNull();
 
     setPublication(undefined);
+    // The real event the SDK emits on unpublish; a wrong event name would not
+    // reach the subscription, because this is a real emitter.
     emit(ParticipantEvent.LocalTrackUnpublished);
     await flushPromises();
 
@@ -120,11 +129,47 @@ describe("observeSoundboardProcessor", () => {
 
   it("stays hidden while there is no microphone track", async () => {
     const { participant } = fakeParticipant();
-    const room = { localParticipant: participant } as unknown as LivekitRoom;
 
-    observeSoundboardProcessor(scope, room, logger);
+    observeSoundboardProcessor(scope, roomWith(participant), logger);
     await flushPromises();
 
     expect(soundboardProcessor$.value).toBeNull();
+  });
+
+  it("does not clear another connection's live processor", async () => {
+    // Two connections (multi-SFU) each install their own processor; the module
+    // handle keeps the last one. Unpublishing the stale connection must not
+    // clear the live one.
+    const firstTrack = fakeAudioTrack();
+    const first = fakeParticipant();
+    first.setPublication(publicationFor(firstTrack));
+
+    const secondTrack = fakeAudioTrack();
+    const second = fakeParticipant();
+    second.setPublication(publicationFor(secondTrack));
+
+    const firstScope = new ObservableScope();
+    const secondScope = new ObservableScope();
+    try {
+      observeSoundboardProcessor(firstScope, roomWith(first.participant), logger);
+      await flushPromises();
+      observeSoundboardProcessor(
+        secondScope,
+        roomWith(second.participant),
+        logger,
+      );
+      await flushPromises();
+      expect(soundboardProcessor$.value).not.toBeNull();
+
+      first.setPublication(undefined);
+      first.emit(ParticipantEvent.LocalTrackUnpublished);
+      await flushPromises();
+
+      // The second connection is still live, so its processor must survive.
+      expect(soundboardProcessor$.value).not.toBeNull();
+    } finally {
+      firstScope.end();
+      secondScope.end();
+    }
   });
 });

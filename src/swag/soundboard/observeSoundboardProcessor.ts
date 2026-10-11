@@ -12,7 +12,10 @@ import { type Logger } from "matrix-js-sdk/lib/logger";
 import { observeTrackReference$ } from "../../state/observeTrackReference.ts";
 import { type ObservableScope } from "../../state/ObservableScope.ts";
 import { SoundboardAudioProcessor } from "./SoundboardAudioProcessor.ts";
-import { setSoundboardProcessor } from "./processorHandle.ts";
+import {
+  releaseSoundboardProcessor,
+  setSoundboardProcessor,
+} from "./processorHandle.ts";
 
 /**
  * Keeps a {@link SoundboardAudioProcessor} installed on the microphone track.
@@ -48,7 +51,7 @@ export function observeSoundboardProcessor(
 
   scope.reconcile(micTrack$, async (track) => {
     if (track === null) {
-      setSoundboardProcessor(null);
+      releaseSoundboardProcessor(processor);
       return;
     }
 
@@ -57,11 +60,11 @@ export function observeSoundboardProcessor(
       setSoundboardProcessor(processor);
     } catch (e) {
       logger.error("Failed to install the soundboard audio processor", e);
-      setSoundboardProcessor(null);
+      releaseSoundboardProcessor(processor);
     }
 
     return async () => {
-      setSoundboardProcessor(null);
+      releaseSoundboardProcessor(processor);
       try {
         await track.stopProcessor();
       } catch (e) {

@@ -35,3 +35,16 @@ export function setSoundboardProcessor(
 ): void {
   processorSubject.next(processor);
 }
+
+/**
+ * Clears the handle only if it still holds this processor.
+ *
+ * With more than one connection (multi-SFU) several processors exist; an
+ * unpublish on a stale connection must not clear a live processor belonging to
+ * another connection.
+ */
+export function releaseSoundboardProcessor(
+  processor: SoundboardAudioProcessor,
+): void {
+  if (processorSubject.value === processor) processorSubject.next(null);
+}
