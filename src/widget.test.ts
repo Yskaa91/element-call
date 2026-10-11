@@ -86,6 +86,8 @@ describe("widget", () => {
       { eventType: EventType.RoomMember },
       { eventType: EventType.RoomEncryption },
       { eventType: EventType.GroupCallMemberPrefix },
+      // The soundboard reads the call room's m.space.parent to find its space.
+      { eventType: EventType.SpaceParent },
     ];
 
     const sendRecvToDevice = [
@@ -159,5 +161,16 @@ describe("widget", () => {
       expect.anything(),
       expect.anything(),
     );
+  });
+
+  it("should request the soundboard capabilities", () => {
+    initializeWidget("ANYRTCAPP");
+    const api = createRoomWidgetClientSpy.mock.calls[0][0];
+
+    // Uploading pad audio and reading the call room's space parent.
+    expect(api.hasCapability("org.matrix.msc4039.upload_file")).toBe(true);
+    expect(api.hasCapability("org.matrix.msc2762.receive.state_event:m.space.parent")).toBe(true);
+    // Reading the call room's own state needs its timeline.
+    expect(api.hasCapability("org.matrix.msc2762.timeline:room")).toBe(true);
   });
 });
