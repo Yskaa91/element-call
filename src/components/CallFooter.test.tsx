@@ -23,6 +23,7 @@ const snapshot: FooterSnapshot = {
   toggleAudio: (): void => {},
   toggleVideo: (): void => {},
   toggleBlur: (): void => {},
+  toggleScreenSharing: (): void => {},
   videoBlurEnabled: false,
   hangup: (): void => {},
   buttonSize: "lg",
