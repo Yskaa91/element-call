@@ -21,6 +21,5 @@ The space room's own timeline and the board's state capabilities are requested f
 The board module (`src/swag/soundboard/board.ts`) and the check workflow
 (`.github/workflows/swag-check.yaml`) add no anchor.
 
-`src/state/CallViewModel/localMember/Publisher.test.ts` is a test, not an anchor: it gained a
-`createMockAudioTrack` helper and a `soundboard processor` describe so the check workflow exercises
-the install/remove wiring. The workflow's unit-test step was widened to run that file.
+The soundboard's own tests (`SoundboardAudioProcessor.test.ts`,
+`observeSoundboardProcessor.test.ts`, `SoundboardPanel.test.tsx`) are tests, not anchors.
