@@ -25,6 +25,7 @@ import {
   type DeviceMuteState,
   type HostBridge,
   type HostRequest,
+  type SpeakingState,
 } from "../src/HostBridge";
 import { type JoinCallData } from "../src/widget";
 import { useInitial } from "../src/useInitial";
@@ -51,6 +52,8 @@ export interface ElementCallHostBridge {
   notifyHungUp?(): Promise<void>;
   /** Tells the host the user's current audio and video mute state. */
   notifyDeviceMute?(state: DeviceMuteState): Promise<void>;
+  /** Tells the host the users who are currently speaking. */
+  notifySpeaking?(state: SpeakingState): Promise<void>;
   /**
    * Asks the host to close Element Call: to unmount the component. Its
    * presence is what makes Element Call offer a close button on its error
@@ -156,6 +159,9 @@ export function useComponentHostBridge(
     },
     notifyDeviceMute: async (state) => {
       await latest.current.notifyDeviceMute?.(state);
+    },
+    notifySpeaking: async (state) => {
+      await latest.current.notifySpeaking?.(state);
     },
     // Whether these exist is itself information, so they are read through
     // rather than wrapped unconditionally

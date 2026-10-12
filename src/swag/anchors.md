@@ -11,6 +11,7 @@ in the same commit as the anchor. Rebases should conflict here, and in the ancho
 | -------------- | ------ | --- |
 | `src/widget.ts` | `ElementWidgetActions.Speaking = "io.element.call.speaking"` enum entry | Phase 3 speaking ring: the outward widget action that carries `{ roomId, userIds, ts }` to the host. The action name is the contract a stock Element Web host listens (or rejects) for. |
 | `src/HostBridge.ts` | `SpeakingState` type, `notifySpeaking` on `HostBridge`, in `nullHostBridge` and `createWidgetHostBridge` | Phase 3 speaking ring: `src/swag/speaking` calls `hostBridge.notifySpeaking(...)` to reach the Element Web host; the null bridge keeps standalone Element Call unaffected. |
+| `component/host.ts` | optional `notifySpeaking` on `ElementCallHostBridge`, forwarded in `useComponentHostBridge` | Phase 3 speaking ring: keeps the component host adapter type-complete for the new `HostBridge` member, mirroring `notifyDeviceMute` (a component host may opt in like it opts into mute updates). |
 
 ---
 
