@@ -44,6 +44,14 @@ export enum ElementWidgetActions {
   //   video_enabled?: boolean
   // }
   DeviceMute = "io.element.device_mute",
+  // Tells the host which users are currently speaking, for the swag speaking
+  // ring (src/swag/speaking). Payload:
+  // {
+  //   roomId: string,
+  //   userIds: string[],
+  //   ts: number
+  // }
+  Speaking = "io.element.call.speaking",
 }
 
 export interface JoinCallData {

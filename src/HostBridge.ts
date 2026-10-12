@@ -28,6 +28,16 @@ export type DeviceMuteState = {
   video_enabled: boolean;
 };
 
+/** The users currently speaking, which Element Call tells the host about. */
+export type SpeakingState = {
+  /** The id of the room the users are speaking in. */
+  roomId: string;
+  /** The ids of the users who are speaking, empty when nobody is. */
+  userIds: string[];
+  /** When this snapshot was taken, as milliseconds since the Unix epoch. */
+  ts: number;
+};
+
 /**
  * A mute state change requested by the host. An absent field means "leave this
  * one as it is".
@@ -75,6 +85,8 @@ export interface HostBridge {
   notifyHungUp(): Promise<void>;
   /** Tells the host the user's current audio and video mute state. */
   notifyDeviceMute(state: DeviceMuteState): Promise<void>;
+  /** Tells the host the users who are currently speaking. */
+  notifySpeaking(state: SpeakingState): Promise<void>;
   /**
    * Asks the host to close Element Call, and stops communicating with it. No
    * further calls should be made on this bridge afterwards.
@@ -134,6 +146,7 @@ export const nullHostBridge: HostBridge = {
   notifyJoined: async () => {},
   notifyHungUp: async () => {},
   notifyDeviceMute: async () => {},
+  notifySpeaking: async () => {},
   themeChange$: NEVER,
   join$: NEVER,
   hangUp$: NEVER,
@@ -184,6 +197,7 @@ export function createWidgetHostBridge(widget: WidgetHelpers): HostBridge {
     notifyHungUp: async () => send(ElementWidgetActions.HangupCall),
     notifyDeviceMute: async (state) =>
       send(ElementWidgetActions.DeviceMute, state),
+    notifySpeaking: async (state) => send(ElementWidgetActions.Speaking, state),
     close: async () => {
       try {
         await send(ElementWidgetActions.Close);

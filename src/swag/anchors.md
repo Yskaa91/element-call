@@ -5,6 +5,15 @@ touched only by *anchors*: a registration line, a capability request, a render s
 should be larger than about 20 lines. This file records every anchor and why it exists, and is updated
 in the same commit as the anchor. Rebases should conflict here, and in the anchors, and nowhere else.
 
+## Anchors added by phase 3 (speaking ring)
+
+| Upstream file  | Anchor | Why |
+| -------------- | ------ | --- |
+| `src/widget.ts` | `ElementWidgetActions.Speaking = "io.element.call.speaking"` enum entry | Phase 3 speaking ring: the outward widget action that carries `{ roomId, userIds, ts }` to the host. The action name is the contract a stock Element Web host listens (or rejects) for. |
+| `src/HostBridge.ts` | `SpeakingState` type, `notifySpeaking` on `HostBridge`, in `nullHostBridge` and `createWidgetHostBridge` | Phase 3 speaking ring: `src/swag/speaking` calls `hostBridge.notifySpeaking(...)` to reach the Element Web host; the null bridge keeps standalone Element Call unaffected. |
+
+---
+
 ## Anchors added by phase 2 (soundboard)
 
 | Upstream file  | Anchor                                                                                                                    | Why                                                                                                                                                     |
