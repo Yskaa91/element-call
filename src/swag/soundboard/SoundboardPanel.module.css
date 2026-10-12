@@ -4,6 +4,9 @@
   align-items: center;
 }
 
+/* FlutterFlow-style dark card: near-black surface, one subtle border, cyan
+   where their theme uses purple. Deliberately fixed-dark rather than themed:
+   the household runs Element Call in dark mode, and the design asked for. */
 .panel {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -12,76 +15,96 @@
   width: min(320px, 80vw);
   max-height: 50vh;
   overflow-y: auto;
-  padding: 12px;
-  border-radius: 8px;
-  background: var(--cpd-color-bg-subtle-primary, #fff);
-  box-shadow: var(--cpd-shadow-elevated, 0 2px 12px rgb(0 0 0 / 20%));
-  color: var(--cpd-color-text-primary, #111);
+  padding: 14px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 12px;
+  background: #12121a;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 55%);
+  color: #f2f2f5;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 /* Title bar: purely visual — the footer toggle button already names the
    control, so this stays out of the accessibility tree. */
 .titleBar {
   font-weight: 600;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--cpd-color-border-interactive-secondary, #ccc);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
 }
 
 .error {
   margin: 0;
-  color: var(--cpd-color-text-critical-primary, #c00);
+  color: #ff7a90;
 }
 
-/* The upload form: one bordered group so the name field and the file picker
+/* The upload form: one lighter card so the name field and the file picker
    read as a single step. */
 .upload {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--cpd-color-border-interactive-secondary, #ccc);
-  border-radius: 8px;
-  background: var(--cpd-color-bg-canvas-default, transparent);
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 10px;
+  background: #1b1b26;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  font-size: 13px;
+  color: #b9b9c7;
 }
 
 .field input[type="text"] {
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 8px;
-  border: 1px solid var(--cpd-color-border-interactive-secondary, #ccc);
-  border-radius: 6px;
-  background: var(--cpd-color-bg-canvas-default, #fff);
-  color: inherit;
+  padding: 8px 10px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  background: #0c0c13;
+  color: #f2f2f5;
   font: inherit;
 }
 
-/* The file picker looks like a button: the native input stays focusable but
-   invisible, and the whole label opens the dialog. */
+.field input[type="text"]::placeholder {
+  color: #6e6e80;
+}
+
+.field input[type="text"]:focus {
+  outline: none;
+  border-color: #67e8f9;
+  box-shadow: 0 0 0 2px rgb(103 232 249 / 25%);
+}
+
+/* The file picker is the primary action: light cyan fill, dark text, soft
+   glow. The native input stays focusable but invisible, and the whole label
+   opens the dialog. */
 .fileButton {
   display: block;
-  padding: 8px;
-  border: 1px dashed var(--cpd-color-border-interactive-secondary, #ccc);
-  border-radius: 6px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #67e8f9;
+  box-shadow: 0 0 16px rgb(103 232 249 / 30%);
+  color: #083038;
+  font-weight: 600;
   text-align: center;
   cursor: pointer;
 }
 
 .fileButton:hover {
-  border-color: var(--cpd-color-border-interactive-hovered, #999);
+  background: #8deefb;
 }
 
 .fileButton:focus-within {
-  outline: 2px solid var(--cpd-color-border-focused, #0a84ff);
-  outline-offset: 1px;
+  outline: 2px solid #a5f3fc;
+  outline-offset: 2px;
 }
 
 .fileButton input[type="file"] {
@@ -93,12 +116,14 @@
 
 .empty {
   margin: 0;
+  color: #b9b9c7;
+  font-size: 13px;
 }
 
 .pads {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -106,22 +131,36 @@
 
 .pad {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
 }
 
+/* Pads are dark tiles with a subtle border, like the widget grid. */
 .padButton {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 8px 10px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 8px;
+  background: #1b1b26;
+  color: #f2f2f5;
+  font: inherit;
+  cursor: pointer;
+}
+
+.padButton:hover {
+  border-color: rgb(255 255 255 / 22%);
+  background: #232330;
 }
 
 /* A pad that has just been triggered, so a click does not look like a no-op. */
 .padButton[data-playing="true"] {
-  outline: 2px solid var(--cpd-color-border-focused, #0a84ff);
-  outline-offset: 1px;
+  border-color: #67e8f9;
+  box-shadow: 0 0 12px rgb(103 232 249 / 35%);
+  outline: none;
 }
 
 .gain {
@@ -129,8 +168,11 @@
   align-items: center;
   gap: 8px;
   margin: 0;
+  font-size: 13px;
+  color: #b9b9c7;
 }
 
 .gain input {
   flex: 1;
+  accent-color: #67e8f9;
 }
