@@ -46,7 +46,9 @@ function setup() {
     connect: vi.fn(),
     disconnect: vi.fn(),
   };
-  const AudioWorkletNodeMock = vi.fn(() => workletNode);
+  const AudioWorkletNodeMock = vi.fn(function () {
+    return workletNode;
+  });
   const audioContext = {
     audioWorklet: { addModule },
   } as unknown as AudioContext;
@@ -146,7 +148,7 @@ describe("attachDenoiseStage", () => {
 
   it("returns null and keeps the direct connection when the AudioWorkletNode constructor throws", async () => {
     const mocks = setup();
-    mocks.AudioWorkletNodeMock.mockImplementation(() => {
+    mocks.AudioWorkletNodeMock.mockImplementation(function () {
       throw new Error("Unsupported sample rate: 44100.");
     });
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
