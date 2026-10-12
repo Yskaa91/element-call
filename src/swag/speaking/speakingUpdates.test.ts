@@ -124,32 +124,27 @@ describe("sendSpeakingUpdates", () => {
   }, 18_000);
 
   it("sends the empty set via leading edge, then silence (no heartbeat while idle)", () => {
-    makeScheduler().run(({ flush }) => {
-      const scope = new ObservableScope();
-      const hostBridge = mockHostBridge();
-      const speaking$ = new Subject<string[]>();
+    const s = makeScheduler();
+    const scope = new ObservableScope();
+    const hostBridge = mockHostBridge();
+    const speaking$ = new Subject<string[]>();
 
-      sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
 
-      speaking$.next(["@alice:hs"]);
-      flush(SPEAKING_THROTTLE_MS);
+    speaking$.next(["@alice:hs"]);
+    // Flush past the throttle window so the duration timer fires and
+    // _throttled resets before the empty value arrives.
+    flushTo(s, SPEAKING_THROTTLE_MS + 1);
 
-      speaking$.next([]);
-      // Flush well past several heartbeat intervals — a heartbeat firing late
-      // on an empty set would show up as a second empty send here.
-      flush(SPEAKING_THROTTLE_MS + 3 * SPEAKING_HEARTBEAT_MS);
+    speaking$.next([]);
+    // Flush well past several heartbeat intervals — a heartbeat firing late
+    // on an empty set would show up as a second empty send here.
+    flushTo(s, SPEAKING_THROTTLE_MS + 3 * SPEAKING_HEARTBEAT_MS);
 
-      try {
-        const emptySends = hostBridge.sent.filter(
-          (x) => x.userIds.length === 0,
-        );
-        expect(emptySends).toHaveLength(1);
-      } finally {
-        // Must always end the scope, otherwise run() teardown flushes
-        // with the heartbeat timer still alive → infinite reschedule → OOM.
-        scope.end();
-      }
-    });
+    const emptySends = hostBridge.sent.filter((x) => x.userIds.length === 0);
+    expect(emptySends).toHaveLength(1);
+
+    scope.end();
   });
 
   it("rejects notifySpeaking: logs once then swallows", async () => {
