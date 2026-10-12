@@ -56,9 +56,6 @@ import {
   cameraFramerate as cameraFramerateSetting,
   cameraBitrate as cameraBitrateSetting,
   cameraCodec as cameraCodecSetting,
-  echoCancellationSetting,
-  noiseSuppressionSetting,
-  autoGainControlSetting,
   type VideoCodec,
   enableExtendedLivekitLogs as enableExtendedLivekitLogsSetting,
 } from "./settings";
@@ -314,60 +311,6 @@ export const DeveloperSettingsTab: FC<Props> = ({
             </div>
           </>
         )}
-      </>
-    );
-  };
-
-  const AudioProcessingSettings: React.FC = (): ReactNode => {
-    const [echoCancellation, setEchoCancellation] = useSetting(
-      echoCancellationSetting,
-    );
-    const [noiseSuppression, setNoiseSuppression] = useSetting(
-      noiseSuppressionSetting,
-    );
-    const [autoGainControl, setAutoGainControl] = useSetting(
-      autoGainControlSetting,
-    );
-
-    return (
-      <>
-        <h4>{t("settings.audio_processing_header", "Audio processing")}</h4>
-        <p>
-          {t(
-            "settings.audio_processing_description",
-            "Changes apply on next call join.",
-          )}
-        </p>
-        <FieldRow>
-          <InputField
-            id="echoCancellation"
-            label={t("settings.echo_cancellation_label", "Echo cancellation")}
-            type="checkbox"
-            checked={echoCancellation}
-            onChange={(e): void => setEchoCancellation(e.target.checked)}
-          />
-        </FieldRow>
-        <FieldRow>
-          <InputField
-            id="noiseSuppression"
-            label={t("settings.noise_suppression_label", "Noise suppression")}
-            type="checkbox"
-            checked={noiseSuppression}
-            onChange={(e): void => setNoiseSuppression(e.target.checked)}
-          />
-        </FieldRow>
-        <FieldRow>
-          <InputField
-            id="autoGainControl"
-            label={t(
-              "settings.auto_gain_control_label",
-              "Automatic gain control",
-            )}
-            type="checkbox"
-            checked={autoGainControl}
-            onChange={(e): void => setAutoGainControl(e.target.checked)}
-          />
-        </FieldRow>
       </>
     );
   };
@@ -676,8 +619,6 @@ export const DeveloperSettingsTab: FC<Props> = ({
         ]}
         bitrateRange={{ min: 500_000, max: 15_000_000, step: 500_000 }}
       />
-      <Separator />
-      <AudioProcessingSettings />
       <Separator />
       <p>{t("developer_mode.environment_variables")}</p>
       <pre className={styles.pre}>{JSON.stringify(env, null, 2)}</pre>

@@ -233,6 +233,13 @@
     "feedback_tab_thank_you": "Thanks, we received your feedback!",
     "feedback_tab_title": "Feedback",
     "framerate_label": "Framerate",
+    "noise_cancellation_mode_browser": "Browser (default)",
+    "noise_cancellation_mode_browser_description": "Uses your browser's built-in echo cancellation, noise suppression, and automatic gain control. The toggles below still apply.",
+    "noise_cancellation_mode_gtcrn": "Enhanced (GTCRN)",
+    "noise_cancellation_mode_gtcrn_description": "Replaces browser noise suppression with the GTCRN denoiser. Echo cancellation and automatic gain control still follow the toggles below.",
+    "noise_cancellation_mode_label": "Noise cancellation",
+    "noise_cancellation_mode_off": "Off",
+    "noise_cancellation_mode_off_description": "Disables all browser processing, including echo cancellation.",
     "noise_suppression_label": "Noise suppression",
     "opt_in_description": "<0></0><1></1>You may withdraw consent by unchecking this box. If you are currently in a call, this setting will take effect at the end of the call.",
     "preferences_tab": {

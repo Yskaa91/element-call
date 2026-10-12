@@ -28,6 +28,7 @@ import {
 import { PreferencesSettingsTab } from "./PreferencesSettingsTab";
 import { Slider } from "../Slider";
 import { DeviceSelection } from "./DeviceSelection";
+import { NoiseCancellationSettings } from "../swag/nc/NoiseCancellationSettings";
 import { useTrackProcessor } from "../livekit/TrackProcessorContext";
 import {
   DeveloperSettingsTab,
@@ -179,6 +180,7 @@ export const SettingsModal: FC<Props> = ({
               step={0.01}
             />
           </div>
+          <NoiseCancellationSettings />
         </Form>
       </>
     ),

@@ -46,6 +46,8 @@ The soundboard's own tests (`SoundboardAudioProcessor.test.ts`,
 | Upstream file | Anchor | Why |
 | ------------- | ------ | --- |
 | `src/state/CallViewModel/remoteMembers/ConnectionFactory.ts` | the three `…Setting.getValue()` mic-processing reads wrapped in `micProcessingOptions(readNoiseCancellationMode(), toggles)`, spread into `audioCaptureDefaults` (plus its imports) | Phase 4 noise cancellation: the single place LiveKit's microphone capture options are built. The mode setting (`src/swag/nc/mode.ts`) maps onto the toggles here — `browser` passes the toggles through, `gtcrn` forces browser noise suppression off (the GTCRN stage replaces it, Task 3), `off` disables all browser processing. `voiceIsolation` stays unset, so LiveKit's default `true` keeps the OS-level isolation. Everything the user stored as raw localStorage resolves to `browser` on an unknown value, so upgrades stay safe. |
+| `src/settings/SettingsModal.tsx` | `<NoiseCancellationSettings />` rendered inside `audioTab`'s `<Form>` (plus its import) | Phase 4 noise cancellation: promotes the mode selector and the three mic-processing toggles into the normal Audio tab. The UI itself lives in `src/swag/nc/NoiseCancellationSettings.tsx`; this is just the render slot. |
+| `src/settings/DeveloperSettingsTab.tsx` | the local `AudioProcessingSettings` component and its render site removed (plus the now-unused toggle-setting imports) | Promoted per spec §6.4; the logic now lives in `src/swag/nc/`, and the dev tab keeping its own copy would be two sources of truth. |
 
 Naming note (not an anchor): the microphone graph that phase 4 splices its GTCRN stage
 into lives in `src/swag/soundboard/SoundboardAudioProcessor.ts` — the module is named for
