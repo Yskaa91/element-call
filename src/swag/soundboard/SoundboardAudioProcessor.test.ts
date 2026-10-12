@@ -9,6 +9,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Track, type AudioProcessorOptions } from "livekit-client";
 
 import { SoundboardAudioProcessor } from "./SoundboardAudioProcessor";
+import { attachDenoiseStage, type DenoiseStage } from "../nc/denoiseStage.ts";
+import { readNoiseCancellationMode } from "../nc/mode.ts";
+
+vi.mock("../nc/denoiseStage.ts", () => ({
+  attachDenoiseStage: vi.fn(),
+}));
+vi.mock("../nc/mode.ts", () => ({
+  readNoiseCancellationMode: vi.fn(() => "browser"),
+}));
 
 /**
  * jsdom has no Web Audio API at all, so the processor is exercised against a
@@ -270,5 +279,119 @@ describe("SoundboardAudioProcessor", () => {
     expect(destination.disconnect).toHaveBeenCalled();
     expect(processed.stop).toHaveBeenCalledOnce();
     expect(processor.processedTrack).toBeUndefined();
+  });
+});
+
+/** Runs pending microtasks so a resolved attach promise can be observed. */
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** A fake denoise stage whose dispose posts "destroy", like the real one. */
+function fakeStage(): {
+  stage: DenoiseStage;
+  dispose: ReturnType<typeof vi.fn>;
+  port: { postMessage: ReturnType<typeof vi.fn> };
+} {
+  const port = { postMessage: vi.fn() };
+  const dispose = vi.fn(() => port.postMessage("destroy"));
+  return { stage: { dispose }, dispose, port };
+}
+
+describe("SoundboardAudioProcessor noise cancellation", () => {
+  beforeEach(() => {
+    vi.mocked(readNoiseCancellationMode).mockReturnValue("browser");
+    vi.mocked(attachDenoiseStage).mockReset().mockResolvedValue(null);
+  });
+
+  it("with gtcrn, init attaches the stage between micGain and destination", async () => {
+    vi.mocked(readNoiseCancellationMode).mockReturnValue("gtcrn");
+
+    const processor = new SoundboardAudioProcessor();
+    await processor.init(initOptions(context));
+
+    expect(attachDenoiseStage).toHaveBeenCalledOnce();
+    expect(attachDenoiseStage).toHaveBeenCalledWith(
+      context,
+      gainOf(context),
+      destinationOf(context),
+    );
+  });
+
+  it("with browser and off, init does not attach a stage", async () => {
+    const processor = new SoundboardAudioProcessor();
+    await processor.init(initOptions(context));
+    await processor.destroy();
+
+    vi.mocked(readNoiseCancellationMode).mockReturnValue("off");
+    const offProcessor = new SoundboardAudioProcessor();
+    await offProcessor.init(initOptions(context));
+
+    expect(attachDenoiseStage).not.toHaveBeenCalled();
+  });
+
+  it("destroy disposes exactly the held stage", async () => {
+    vi.mocked(readNoiseCancellationMode).mockReturnValue("gtcrn");
+    const { stage, dispose, port } = fakeStage();
+    vi.mocked(attachDenoiseStage).mockResolvedValue(stage);
+
+    const processor = new SoundboardAudioProcessor();
+    await processor.init(initOptions(context));
+    await flush();
+    expect(dispose).not.toHaveBeenCalled();
+
+    await processor.destroy();
+
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(port.postMessage).toHaveBeenCalledWith("destroy");
+  });
+
+  it("disposes a stage that resolves after destroy instead of holding it", async () => {
+    vi.mocked(readNoiseCancellationMode).mockReturnValue("gtcrn");
+    let resolveStage!: (stage: DenoiseStage | null) => void;
+    const pending = new Promise<DenoiseStage | null>((resolve) => {
+      resolveStage = resolve;
+    });
+    vi.mocked(attachDenoiseStage).mockReturnValue(pending);
+
+    const processor = new SoundboardAudioProcessor();
+    await processor.init(initOptions(context));
+    await processor.destroy();
+
+    const { stage, dispose } = fakeStage();
+    resolveStage(stage);
+    await flush();
+
+    expect(dispose).toHaveBeenCalledOnce();
+    // Not held: a second destroy has nothing left to dispose.
+    await processor.destroy();
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
+  it("restart leaves exactly one live stage and no leak", async () => {
+    vi.mocked(readNoiseCancellationMode).mockReturnValue("gtcrn");
+
+    const first = fakeStage();
+    vi.mocked(attachDenoiseStage).mockResolvedValue(first.stage);
+    const processor = new SoundboardAudioProcessor();
+    await processor.init(initOptions(context));
+    await flush();
+    expect(first.dispose).not.toHaveBeenCalled();
+
+    const second = fakeStage();
+    vi.mocked(attachDenoiseStage).mockResolvedValue(second.stage);
+    await processor.restart({
+      kind: Track.Kind.Audio,
+      track: { id: "mic-2" } as unknown as MediaStreamTrack,
+    } as AudioProcessorOptions);
+    await flush();
+
+    expect(attachDenoiseStage).toHaveBeenCalledTimes(2);
+    expect(first.dispose).toHaveBeenCalledOnce();
+    expect(second.dispose).not.toHaveBeenCalled();
+
+    await processor.destroy();
+    expect(second.dispose).toHaveBeenCalledOnce();
+    expect(first.dispose).toHaveBeenCalledOnce();
   });
 });
