@@ -158,6 +158,15 @@ describe("serializeBoard", () => {
   it("writes the agreed content shape", () => {
     expect(serializeBoard([sound()])).toEqual({ version: 1, sounds: [wireSound()] });
   });
+
+  it("rounds a fractional duration to an integer: Matrix content must not contain floats", () => {
+    // Decoded audio durations are fractional seconds, so durationMs is
+    // fractional too — and Synapse answers M_BAD_JSON to a float in event
+    // content. The wire value must be an integer for any input.
+    const serialized = serializeBoard([sound({ durationMs: 1234.56789 })]);
+    expect(serialized.sounds[0].duration_ms).toBe(1235);
+    expect(Number.isInteger(serialized.sounds[0].duration_ms)).toBe(true);
+  });
 });
 
 describe("addSound", () => {

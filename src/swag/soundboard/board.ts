@@ -118,7 +118,11 @@ export function serializeBoard(sounds: SoundboardSound[]): SoundboardBoardConten
       mxc: sound.mxc,
       mimetype: sound.mimetype,
       size: sound.size,
-      duration_ms: sound.durationMs,
+      // Matrix event content must not contain floats (Synapse answers
+      // M_BAD_JSON otherwise), and the decoded duration that produces
+      // durationMs is fractional seconds, so round it here where every
+      // write flows through rather than in each caller.
+      duration_ms: Math.round(sound.durationMs),
       added_by: sound.addedBy,
       added_ts: sound.addedTs,
     })),
