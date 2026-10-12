@@ -137,7 +137,7 @@ describe("sendSpeakingUpdates", () => {
     // Leading edge rejects immediately; trailing edge rejects at window close.
     speaking$.next(["@alice:hs"]);
     speaking$.next(["@bob:hs"]);
-    await vi.advanceTimersByTimeAsync(SPEAKING_THROTTLE_MS);
+    await vi.advanceTimersByTimeAsync(SPEAKING_THROTTLE_MS + 1);
 
     await Promise.resolve();
     await Promise.resolve();
