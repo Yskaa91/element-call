@@ -8,7 +8,7 @@ Please see LICENSE in the repository root for full details.
 import { afterEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { TooltipProvider } from "@vector-im/compound-web";
+import { Root as Form, TooltipProvider } from "@vector-im/compound-web";
 
 import { NoiseCancellationSettings } from "./NoiseCancellationSettings";
 import {
@@ -24,7 +24,9 @@ import {
 function renderSettings(): void {
   render(
     <TooltipProvider>
-      <NoiseCancellationSettings />
+      <Form>
+        <NoiseCancellationSettings />
+      </Form>
     </TooltipProvider>,
   );
 }

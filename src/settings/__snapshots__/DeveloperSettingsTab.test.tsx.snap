@@ -459,7 +459,7 @@ exports[`DeveloperSettingsTab > renders and matches snapshot 1`] = `
       class="_field_1bd8c0 _checkboxField_1bd8c0"
     >
       <input
-        aria-describedby="_r_i_"
+        aria-describedby="_r_f_"
         id="cameraToggle"
         type="checkbox"
       />
@@ -489,7 +489,7 @@ exports[`DeveloperSettingsTab > renders and matches snapshot 1`] = `
       </label>
       <p
         class="_description_1bd8c0"
-        id="_r_i_"
+        id="_r_f_"
       >
         Configure resolution, framerate, bitrate, and codec for camera video. Changes apply on next call join.
       </p>
@@ -511,7 +511,7 @@ exports[`DeveloperSettingsTab > renders and matches snapshot 1`] = `
       class="_field_1bd8c0 _checkboxField_1bd8c0"
     >
       <input
-        aria-describedby="_r_j_"
+        aria-describedby="_r_g_"
         id="screenShareToggle"
         type="checkbox"
       />
@@ -541,7 +541,7 @@ exports[`DeveloperSettingsTab > renders and matches snapshot 1`] = `
       </label>
       <p
         class="_description_1bd8c0"
-        id="_r_j_"
+        id="_r_g_"
       >
         Configure resolution, framerate, bitrate, and codec for screen sharing
       </p>
