@@ -247,11 +247,59 @@ describe("SoundboardPanel", () => {
     const saved = client.save.mock.calls[0][0] as SoundboardSound[];
     expect(saved).toHaveLength(2);
     expect(saved[1]).toMatchObject({
-      name: "new.ogg",
+      name: "new",
       mxc: "mxc://example.org/new",
       mimetype: "audio/ogg",
       durationMs: 1000,
     });
+  });
+
+  it("uses the typed name for a new pad instead of the file name", async () => {
+    const client = makeClient({
+      upload: vi.fn().mockResolvedValue({
+        mxc: "mxc://example.org/new",
+        mimetype: "audio/ogg",
+        size: 10,
+      }),
+    });
+    vi.mocked(createSoundboardClient).mockResolvedValue(client as never);
+    renderPanel();
+    await openPanel();
+
+    await userEvent.type(screen.getByTestId("soundboard-name"), "Airhorn blast");
+    await userEvent.upload(
+      screen.getByTestId("soundboard-file"),
+      soundFile("riser-hit-sfx-001.mp3"),
+    );
+
+    await waitFor(() => expect(client.save).toHaveBeenCalledTimes(1));
+    const saved = client.save.mock.calls[0][0] as SoundboardSound[];
+    expect(saved[1]).toMatchObject({ name: "Airhorn blast" });
+    // A successful add clears the field for the next upload.
+    expect(screen.getByTestId("soundboard-name")).toHaveValue("");
+  });
+
+  it("falls back to the file name without its extension when the name is blank", async () => {
+    const client = makeClient({
+      upload: vi.fn().mockResolvedValue({
+        mxc: "mxc://example.org/new",
+        mimetype: "audio/ogg",
+        size: 10,
+      }),
+    });
+    vi.mocked(createSoundboardClient).mockResolvedValue(client as never);
+    renderPanel();
+    await openPanel();
+
+    await userEvent.type(screen.getByTestId("soundboard-name"), "   ");
+    await userEvent.upload(
+      screen.getByTestId("soundboard-file"),
+      soundFile("riser-hit-sfx-001.mp3"),
+    );
+
+    await waitFor(() => expect(client.save).toHaveBeenCalledTimes(1));
+    const saved = client.save.mock.calls[0][0] as SoundboardSound[];
+    expect(saved[1]).toMatchObject({ name: "riser-hit-sfx-001" });
   });
 
   it("removes a pad and saves the shortened board", async () => {

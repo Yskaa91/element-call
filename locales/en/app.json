@@ -265,6 +265,8 @@
     "empty": "No sounds yet",
     "full": "The soundboard is full",
     "microphone_not_ready": "The microphone is not ready yet",
+    "name_label": "Sound name",
+    "name_placeholder": "Optional — defaults to the file name",
     "play_failed": "Could not play the sound",
     "read_failed": "Could not read the soundboard",
     "reach_failed": "Could not reach the soundboard",

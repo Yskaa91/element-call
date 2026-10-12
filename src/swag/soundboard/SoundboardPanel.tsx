@@ -50,10 +50,22 @@ export interface SoundboardPanelProps {
 
 const MAX_NAME_LENGTH = 40;
 
+// Names are free text from whoever uploads; cap what is stored so one paste
+// cannot wedge the board event, while displayName truncates what renders.
+const MAX_STORED_NAME_LENGTH = 100;
+
 function displayName(name: string): string {
   return name.length > MAX_NAME_LENGTH
     ? `${name.slice(0, MAX_NAME_LENGTH)}…`
     : name;
+}
+
+function defaultPadName(fileName: string): string {
+  const stripped = fileName.replace(/\.[^/.]+$/, "");
+  return (stripped.length > 0 ? stripped : fileName).slice(
+    0,
+    MAX_STORED_NAME_LENGTH,
+  );
 }
 
 function messageOf(error: unknown, fallback: string): string {
@@ -93,6 +105,9 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
   const [playingIds, setPlayingIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  // The name for the next upload, typed before picking the file. Empty means
+  // "use the file name".
+  const [pendingName, setPendingName] = useState("");
 
   // Decoded buffers, so a repeated trigger does not re-download and re-decode.
   const buffers = useRef(new Map<string, AudioBuffer>());
@@ -223,9 +238,13 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
         }
 
         const uploaded = await client.upload(file);
+        const typed = pendingName.trim();
         const sound: SoundboardSound = {
           id: newId(),
-          name: file.name,
+          name: (typed.length > 0 ? typed : defaultPadName(file.name)).slice(
+            0,
+            MAX_STORED_NAME_LENGTH,
+          ),
           mxc: uploaded.mxc,
           mimetype: uploaded.mimetype,
           size: uploaded.size,
@@ -236,11 +255,12 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
         const next = addSound(sounds, sound);
         await client.save(next);
         setSounds(next);
+        setPendingName("");
       } catch (e) {
         setError(messageOf(e, t("soundboard.add_failed")));
       }
     },
-    [client, sounds, matrixClient, t],
+    [client, sounds, matrixClient, pendingName, t],
   );
 
   const onFileChange = useCallback(
@@ -320,6 +340,17 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
               ))}
             </ul>
           )}
+          <label className={styles.add}>
+            <span>{t("soundboard.name_label")}</span>
+            <input
+              type="text"
+              value={pendingName}
+              maxLength={MAX_STORED_NAME_LENGTH}
+              placeholder={t("soundboard.name_placeholder")}
+              onChange={(event) => setPendingName(event.target.value)}
+              data-testid={`${testIdPrefix}-name`}
+            />
+          </label>
           <label className={styles.add}>
             <input
               type="file"
