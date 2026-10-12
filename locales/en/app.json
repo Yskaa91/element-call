@@ -240,6 +240,7 @@
     "noise_cancellation_mode_label": "Noise cancellation",
     "noise_cancellation_mode_off": "Off",
     "noise_cancellation_mode_off_description": "Disables all browser processing, including echo cancellation.",
+    "noise_cancellation_toggle_disabled": "Disabled by the selected mode.",
     "noise_suppression_label": "Noise suppression",
     "opt_in_description": "<0></0><1></1>You may withdraw consent by unchecking this box. If you are currently in a call, this setting will take effect at the end of the call.",
     "preferences_tab": {

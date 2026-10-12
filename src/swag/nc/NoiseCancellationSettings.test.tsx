@@ -84,4 +84,52 @@ describe("NoiseCancellationSettings", () => {
     await user.click(screen.getByLabelText("Automatic gain control"));
     expect(autoGainControlSetting.getValue()).toBe(false);
   });
+
+  describe("toggle disabled state", () => {
+    it("disables only noise suppression in gtcrn mode", () => {
+      noiseCancellationSetting.setValue("gtcrn");
+      renderSettings();
+      expect(screen.getByLabelText("Noise suppression")).toBeDisabled();
+      expect(screen.getByLabelText("Echo cancellation")).toBeEnabled();
+      expect(screen.getByLabelText("Automatic gain control")).toBeEnabled();
+      expect(
+        screen.getByText("Disabled by the selected mode."),
+      ).toBeInTheDocument();
+    });
+
+    it("disables all three toggles in off mode", () => {
+      noiseCancellationSetting.setValue("off");
+      renderSettings();
+      expect(screen.getByLabelText("Echo cancellation")).toBeDisabled();
+      expect(screen.getByLabelText("Noise suppression")).toBeDisabled();
+      expect(screen.getByLabelText("Automatic gain control")).toBeDisabled();
+    });
+
+    it("keeps every toggle enabled in browser mode", () => {
+      noiseCancellationSetting.setValue("browser");
+      renderSettings();
+      expect(screen.getByLabelText("Echo cancellation")).toBeEnabled();
+      expect(screen.getByLabelText("Noise suppression")).toBeEnabled();
+      expect(screen.getByLabelText("Automatic gain control")).toBeEnabled();
+      expect(
+        screen.queryByText("Disabled by the selected mode."),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not rewrite the stored setting when the mode overrides it", async () => {
+      const user = userEvent.setup();
+      noiseSuppressionSetting.setValue(true);
+      renderSettings();
+
+      await user.click(screen.getByDisplayValue("gtcrn"));
+      expect(screen.getByLabelText("Noise suppression")).toBeDisabled();
+      expect(screen.getByLabelText("Noise suppression")).toBeChecked();
+      expect(noiseSuppressionSetting.getValue()).toBe(true);
+
+      await user.click(screen.getByDisplayValue("browser"));
+      expect(screen.getByLabelText("Noise suppression")).toBeEnabled();
+      expect(screen.getByLabelText("Noise suppression")).toBeChecked();
+      expect(noiseSuppressionSetting.getValue()).toBe(true);
+    });
+  });
 });
