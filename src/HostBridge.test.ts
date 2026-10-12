@@ -87,6 +87,43 @@ describe("createWidgetHostBridge", () => {
         { audio_enabled: true, video_enabled: false },
       );
     });
+
+    test("sends who is speaking to the host", async () => {
+      const transport = mockTransport();
+      const bridge = createWidgetHostBridge(mockWidget({ transport } as never));
+
+      // The literal action rather than the enum, so the test pins the value the
+      // host has to listen for.
+      await bridge.notifySpeaking({
+        roomId: "!room:example.org",
+        userIds: ["@alice:example.org", "@bob:example.org"],
+        ts: 1752279414,
+      });
+
+      expect(transport.send).toHaveBeenCalledWith("io.element.call.speaking", {
+        roomId: "!room:example.org",
+        userIds: ["@alice:example.org", "@bob:example.org"],
+        ts: 1752279414,
+      });
+    });
+
+    test("propagates a failure to deliver the speaking state", async () => {
+      const transport = {
+        send: vi.fn().mockRejectedValue(new Error("unsupported action")),
+        reply: vi.fn(),
+        stop: vi.fn(),
+      };
+      const bridge = createWidgetHostBridge(mockWidget({ transport } as never));
+
+      // A stock host without support for the action rejects the send.
+      await expect(
+        bridge.notifySpeaking({
+          roomId: "!room:example.org",
+          userIds: [],
+          ts: 0,
+        }),
+      ).rejects.toThrow("unsupported action");
+    });
   });
 
   describe("relaying what the host asks for", () => {
@@ -302,5 +339,15 @@ describe("nullHostBridge", () => {
 
   test("does not allow joining unmuted on the intent, since nobody vouched for it", () => {
     expect(nullHostBridge.allowJoinUnmutedViaIntent).toBe(false);
+  });
+
+  test("silently ignores speaking state, since it has no host to tell", async () => {
+    await expect(
+      nullHostBridge.notifySpeaking({
+        roomId: "!room:example.org",
+        userIds: ["@alice:example.org"],
+        ts: 0,
+      }),
+    ).resolves.toBeUndefined();
   });
 });
