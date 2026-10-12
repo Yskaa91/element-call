@@ -55,5 +55,7 @@ the soundboard because phase 2 built it there. The graph is now shared between t
 soundboard and noise cancellation. Renaming the module is deliberately deferred to phase 5;
 do not be surprised that noise-cancellation code touches a "soundboard" file.
 
+| `vite.config.ts` | `base: "./"` at the top of the returned config (plus its comment) | Build fix, not a feature: Element Web always loads the *embedded* copy under `/widgets/element-call/`, where the default absolute `/assets/` paths 404 and the widget never boots ("stuck on loading"). A relative base serves both that path and the standalone app at the domain root — the same approach as `vite-embedded.config.ts`. |
+
 ---
 

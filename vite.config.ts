@@ -120,6 +120,11 @@ export default ({
 
   return {
     ...vitePluginsConfig({ mode }),
+    // swag anchor: relative asset base so the same build works standalone
+    // (served at the domain root) and embedded under Element Web at
+    // /widgets/element-call/ — absolute /assets/ paths 404 there and the
+    // widget never boots. Same approach as vite-embedded.config.ts.
+    base: "./",
     server: {
       host: true,
       port: 3000,
