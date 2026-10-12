@@ -97,6 +97,35 @@ async function openPanel(): Promise<void> {
   await userEvent.click(await screen.findByTestId("soundboard-toggle"));
 }
 
+describe("panel layout", () => {
+  it("shows a Soundboard title bar above the upload form, with the sounds last", async () => {
+    renderPanel();
+    await openPanel();
+
+    const title = screen.getByTestId("soundboard-title");
+    const upload = screen.getByTestId("soundboard-upload");
+    const pads = screen.getByTestId("soundboard-pad-one").closest("ul")!;
+    expect(title).toHaveTextContent("Soundboard");
+    // Title first, then the upload form, then the sounds.
+    expect(
+      title.compareDocumentPosition(upload) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      upload.compareDocumentPosition(pads) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("groups the name field and the file picker inside the upload form", async () => {
+    renderPanel();
+    await openPanel();
+
+    const upload = screen.getByTestId("soundboard-upload");
+    expect(upload).toContainElement(screen.getByTestId("soundboard-name"));
+    expect(upload).toContainElement(screen.getByTestId("soundboard-file"));
+  });
+});
+
 function soundFile(name = "small.ogg", size = 10): File {
   // jsdom's Blob/File have no arrayBuffer(), so give the file one.
   return Object.assign(

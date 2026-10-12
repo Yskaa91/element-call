@@ -17,22 +17,89 @@
   background: var(--cpd-color-bg-subtle-primary, #fff);
   box-shadow: var(--cpd-shadow-elevated, 0 2px 12px rgb(0 0 0 / 20%));
   color: var(--cpd-color-text-primary, #111);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Title bar: purely visual — the footer toggle button already names the
+   control, so this stays out of the accessibility tree. */
+.titleBar {
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--cpd-color-border-interactive-secondary, #ccc);
 }
 
 .error {
-  margin: 0 0 8px;
+  margin: 0;
   color: var(--cpd-color-text-critical-primary, #c00);
 }
 
+/* The upload form: one bordered group so the name field and the file picker
+   read as a single step. */
+.upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--cpd-color-border-interactive-secondary, #ccc);
+  border-radius: 8px;
+  background: var(--cpd-color-bg-canvas-default, transparent);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--cpd-color-border-interactive-secondary, #ccc);
+  border-radius: 6px;
+  background: var(--cpd-color-bg-canvas-default, #fff);
+  color: inherit;
+  font: inherit;
+}
+
+/* The file picker looks like a button: the native input stays focusable but
+   invisible, and the whole label opens the dialog. */
+.fileButton {
+  display: block;
+  padding: 8px;
+  border: 1px dashed var(--cpd-color-border-interactive-secondary, #ccc);
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.fileButton:hover {
+  border-color: var(--cpd-color-border-interactive-hovered, #999);
+}
+
+.fileButton:focus-within {
+  outline: 2px solid var(--cpd-color-border-focused, #0a84ff);
+  outline-offset: 1px;
+}
+
+.fileButton input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
 .empty {
-  margin: 0 0 8px;
+  margin: 0;
 }
 
 .pads {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 6px;
-  margin: 0 0 8px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -61,13 +128,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
 .gain input {
   flex: 1;
-}
-
-.add {
-  display: block;
 }

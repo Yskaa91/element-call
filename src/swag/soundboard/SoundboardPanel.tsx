@@ -290,6 +290,13 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
       </Tooltip>
       {open && (
         <div className={styles.panel} data-testid={`${testIdPrefix}-panel`}>
+          <div
+            className={styles.titleBar}
+            aria-hidden={true}
+            data-testid={`${testIdPrefix}-title`}
+          >
+            {t("soundboard.title")}
+          </div>
           {error !== null && (
             <p
               className={styles.error}
@@ -299,6 +306,32 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
               {error}
             </p>
           )}
+          <section
+            className={styles.upload}
+            aria-label={t("soundboard.add")}
+            data-testid={`${testIdPrefix}-upload`}
+          >
+            <label className={styles.field}>
+              <span>{t("soundboard.name_label")}</span>
+              <input
+                type="text"
+                value={pendingName}
+                maxLength={MAX_STORED_NAME_LENGTH}
+                placeholder={t("soundboard.name_placeholder")}
+                onChange={(event) => setPendingName(event.target.value)}
+                data-testid={`${testIdPrefix}-name`}
+              />
+            </label>
+            <label className={styles.fileButton}>
+              <input
+                type="file"
+                accept="audio/*"
+                onChange={onFileChange}
+                data-testid={`${testIdPrefix}-file`}
+              />
+              <span>{t("soundboard.add")}</span>
+            </label>
+          </section>
           <label className={styles.gain}>
             <span>{t("soundboard.volume")}</span>
             <input
@@ -340,26 +373,6 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
               ))}
             </ul>
           )}
-          <label className={styles.add}>
-            <span>{t("soundboard.name_label")}</span>
-            <input
-              type="text"
-              value={pendingName}
-              maxLength={MAX_STORED_NAME_LENGTH}
-              placeholder={t("soundboard.name_placeholder")}
-              onChange={(event) => setPendingName(event.target.value)}
-              data-testid={`${testIdPrefix}-name`}
-            />
-          </label>
-          <label className={styles.add}>
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={onFileChange}
-              data-testid={`${testIdPrefix}-file`}
-            />
-            {t("soundboard.add")}
-          </label>
         </div>
       )}
     </div>
