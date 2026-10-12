@@ -39,7 +39,11 @@ function fakeNode(): FakeNode {
  */
 function setup() {
   const wasmBinary = new ArrayBuffer(8);
-  const fetchMock = vi.fn(async () => ({ arrayBuffer: async () => wasmBinary }));
+  const fetchMock = vi.fn(
+    async (): Promise<{ arrayBuffer: () => Promise<unknown> }> => ({
+      arrayBuffer: async () => wasmBinary,
+    }),
+  );
   const addModule = vi.fn(async () => {});
   const workletNode = {
     port: { postMessage: vi.fn() },
