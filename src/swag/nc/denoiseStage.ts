@@ -13,6 +13,14 @@ import workletUrl from "./assets/gtcrn-worklet.js?url";
 /** The worklet processor id registered by the vendored GTCRN module. */
 export const GTCRN_PROCESSOR_ID = "@sapphi-red/web-noise-suppressor/gtcrn";
 
+/**
+ * Contexts where `addModule` has already completed successfully. Re-registering
+ * a processor id on one context throws, and `SoundboardAudioProcessor`
+ * reuses its `AudioContext` across restarts, so the second attach in `gtcrn`
+ * mode would otherwise fail and silently leave the mic undenoised.
+ */
+const registeredWorkletContexts = new WeakSet<AudioContext>();
+
 export interface DenoiseStage {
   dispose(): void;
 }
@@ -33,7 +41,10 @@ export async function attachDenoiseStage(
     if (!(wasmBinary instanceof ArrayBuffer)) {
       throw new Error("GTCRN wasm binary did not resolve to an ArrayBuffer");
     }
-    await audioContext.audioWorklet.addModule(workletUrl);
+    if (!registeredWorkletContexts.has(audioContext)) {
+      await audioContext.audioWorklet.addModule(workletUrl);
+      registeredWorkletContexts.add(audioContext);
+    }
     const node = new AudioWorkletNode(audioContext, GTCRN_PROCESSOR_ID, {
       numberOfInputs: 1,
       numberOfOutputs: 1,

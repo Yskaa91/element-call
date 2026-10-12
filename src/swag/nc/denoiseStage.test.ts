@@ -184,6 +184,39 @@ describe("attachDenoiseStage", () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("registers the worklet module once per context across restarts", async () => {
+    const mocks = setup();
+    const input2 = fakeNode();
+    const output2 = fakeNode();
+
+    const first = await attachDenoiseStage(
+      mocks.audioContext,
+      mocks.input.node,
+      mocks.output.node,
+    );
+    const second = await attachDenoiseStage(
+      mocks.audioContext,
+      input2.node,
+      output2.node,
+    );
+
+    expect(first).not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(mocks.addModule).toHaveBeenCalledTimes(1);
+    expect(mocks.input.disconnect).toHaveBeenCalledWith(mocks.output.node);
+    expect(input2.disconnect).toHaveBeenCalledWith(output2.node);
+
+    first!.dispose();
+    second!.dispose();
+    expect(mocks.workletNode.port.postMessage).toHaveBeenCalledTimes(2);
+    expect(mocks.input.connect).toHaveBeenLastCalledWith(mocks.output.node);
+    expect(input2.connect).toHaveBeenLastCalledWith(output2.node);
+
+    // Idempotent after the shared-context re-attach.
+    first!.dispose();
+    expect(mocks.workletNode.port.postMessage).toHaveBeenCalledTimes(2);
+  });
+
   it("dispose() destroys the worklet, restores the direct connection, and is idempotent", async () => {
     const mocks = setup();
 

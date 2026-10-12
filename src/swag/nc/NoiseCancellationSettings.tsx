@@ -85,7 +85,7 @@ export const NoiseCancellationSettings: FC = () => {
     ),
     off: t(
       "settings.noise_cancellation_mode_off_description",
-      "Disables all browser processing, including echo cancellation.",
+      "Disables echo cancellation, noise suppression and automatic gain control.",
     ),
   };
 
