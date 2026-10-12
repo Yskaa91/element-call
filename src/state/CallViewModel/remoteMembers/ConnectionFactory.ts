@@ -39,6 +39,10 @@ import {
   noiseSuppressionSetting,
   autoGainControlSetting,
 } from "../../../settings/settings.ts";
+import {
+  micProcessingOptions,
+  readNoiseCancellationMode,
+} from "../../../swag/nc/mode.ts";
 
 // TODO evaluate if this should be done like the Publisher Factory
 export interface ConnectionFactory {
@@ -175,9 +179,17 @@ function generateRoomOption({
     audioCaptureDefaults: {
       ...liveKitOptions.audioCaptureDefaults,
       deviceId: devices.audioInput.selected$.value?.id,
-      echoCancellation: echoCancellationSetting.getValue(),
-      noiseSuppression: noiseSuppressionSetting.getValue(),
-      autoGainControl: autoGainControlSetting.getValue(),
+      // `voiceIsolation` deliberately stays unset: LiveKit defaults it to
+      // true, which is the OS-level isolation the noise-cancellation modes
+      // build on.
+      ...micProcessingOptions(
+        readNoiseCancellationMode(),
+        {
+          echoCancellation: echoCancellationSetting.getValue(),
+          noiseSuppression: noiseSuppressionSetting.getValue(),
+          autoGainControl: autoGainControlSetting.getValue(),
+        },
+      ),
     },
     audioOutput: {
       // When using controlled audio devices, we don't want to set the
