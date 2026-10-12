@@ -7,7 +7,7 @@ Please see LICENSE in the repository root for full details.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { TestScheduler } from "rxjs/testing";
-import { Subject } from "rxjs";
+import { Subject, VirtualTimeScheduler } from "rxjs";
 
 import {
   sendSpeakingUpdates,
@@ -48,8 +48,9 @@ function makeScheduler(): TestScheduler {
 
 /** Flush virtual time to a specific frame (TestScheduler type omits the arg). */
 function flushTo(s: TestScheduler, frame: number): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TestScheduler type omits maxFrame param
-  (s as any).flush(frame);
+  // TestScheduler.flush() type declares 0 args and may ignore maxFrame;
+  // call VirtualTimeScheduler.flush directly to guarantee the limit.
+  VirtualTimeScheduler.prototype.flush.call(s, frame);
 }
 
 describe("sendSpeakingUpdates", () => {
