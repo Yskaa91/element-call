@@ -139,10 +139,16 @@ describe("sendSpeakingUpdates", () => {
       // on an empty set would show up as a second empty send here.
       flush(SPEAKING_THROTTLE_MS + 3 * SPEAKING_HEARTBEAT_MS);
 
-      const emptySends = hostBridge.sent.filter((x) => x.userIds.length === 0);
-      expect(emptySends).toHaveLength(1);
-
-      scope.end();
+      try {
+        const emptySends = hostBridge.sent.filter(
+          (x) => x.userIds.length === 0,
+        );
+        expect(emptySends).toHaveLength(1);
+      } finally {
+        // Must always end the scope, otherwise run() teardown flushes
+        // with the heartbeat timer still alive → infinite reschedule → OOM.
+        scope.end();
+      }
     });
   });
 
