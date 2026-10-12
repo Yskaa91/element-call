@@ -5,9 +5,8 @@ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
 */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { TestScheduler } from "rxjs/testing";
-import { Subject, VirtualTimeScheduler } from "rxjs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Subject } from "rxjs";
 
 import {
   sendSpeakingUpdates,
@@ -24,76 +23,21 @@ function mockHostBridge(): HostBridge & { sent: SpeakingState[] } {
     notifySpeaking: vi.fn(async (state: SpeakingState) => {
       sent.push(state);
     }),
-    notifyJoined: vi.fn(),
-    notifyHungUp: vi.fn(),
-    notifyDeviceMute: vi.fn(),
-    setAlwaysOnScreen: vi.fn(),
-    contentLoaded: vi.fn(),
-    themeChange$: new Subject(),
-    join$: new Subject(),
-    hangUp$: new Subject(),
-    deviceMute$: new Subject(),
-    supportsProfileChanges: false,
-    canReact: false,
-    canSendEncrypted: false,
   } as unknown as HostBridge;
   return Object.assign(bridge, { sent });
 }
 
-function makeScheduler(): TestScheduler {
-  return new TestScheduler((actual, expected) =>
-    expect(actual).toEqual(expected),
-  );
-}
-
-/** Flush virtual time to a specific frame (TestScheduler type omits the arg). */
-function flushTo(s: TestScheduler, frame: number): void {
-  // TestScheduler.flush() type declares 0 args and may ignore maxFrame;
-  // call VirtualTimeScheduler.flush directly to guarantee the limit.
-  VirtualTimeScheduler.prototype.flush.call(s, frame);
-}
-
 describe("sendSpeakingUpdates", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it("sends the first non-empty set immediately (leading edge)", () => {
-    const s = makeScheduler();
-    const scope = new ObservableScope();
-    const hostBridge = mockHostBridge();
-    const speaking$ = new Subject<string[]>();
-
-    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
-    speaking$.next(["@alice:hs"]);
-    flushTo(s, 100);
-    scope.end();
-
-    const nonEmpty = hostBridge.sent.filter((x) => x.userIds.length > 0);
-    expect(nonEmpty[0].userIds).toEqual(["@alice:hs"]);
-    expect(nonEmpty[0].roomId).toBe("!room:test");
-    expect(nonEmpty[0].ts).toBeTypeOf("number");
-  });
-
-  it("throttles rapid updates: leading + trailing within one SPEAKING_THROTTLE_MS window", () => {
-    const s = makeScheduler();
-    const scope = new ObservableScope();
-    const hostBridge = mockHostBridge();
-    const speaking$ = new Subject<string[]>();
-
-    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
-
-    speaking$.next(["@alice:hs"]);
-    speaking$.next(["@alice:hs", "@bob:hs"]);
-    speaking$.next(["@bob:hs"]);
-    flushTo(s, SPEAKING_THROTTLE_MS);
-    scope.end();
-
-    expect(hostBridge.sent.length).toBeGreaterThanOrEqual(1);
-    expect(hostBridge.sent.length).toBeLessThanOrEqual(2);
-  });
-
-  it("re-sends a non-empty set via the heartbeat timer", () => {
+  it("sends the first non-empty set immediately (leading edge)", async () => {
     const scope = new ObservableScope();
     const hostBridge = mockHostBridge();
     const speaking$ = new Subject<string[]>();
@@ -101,45 +45,78 @@ describe("sendSpeakingUpdates", () => {
     sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
     speaking$.next(["@alice:hs"]);
 
-    // Real time: timer(0, 10000) re-emits after 10 s. Virtual time with
-    // timer(0, 10000) causes infinite reschedule in TestScheduler (OOM),
-    // so this test uses real timers.
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        scope.end();
-        const nonEmpty = hostBridge.sent.filter((x) => x.userIds.length > 0);
-        expect(nonEmpty.length).toBeGreaterThanOrEqual(2);
-        // Pin periodicity: the gap between the last two sends must be
-        // approximately SPEAKING_HEARTBEAT_MS, not merely "a second send".
-        // A non-periodic timer(0) would give a gap of ~2 s (throttle trailing),
-        // failing this assertion.
-        const lastGap =
-          nonEmpty[nonEmpty.length - 1].ts -
-          nonEmpty[nonEmpty.length - 2].ts;
-        expect(lastGap).toBeGreaterThanOrEqual(SPEAKING_HEARTBEAT_MS - 1000);
-        expect(lastGap).toBeLessThanOrEqual(SPEAKING_HEARTBEAT_MS + 1000);
-        resolve();
-      }, 13_000);
-    });
-  }, 18_000);
+    await vi.advanceTimersByTimeAsync(1);
 
-  it("sends the empty set via leading edge, then silence (no heartbeat while idle)", () => {
-    const s = makeScheduler();
+    const nonEmpty = hostBridge.sent.filter((x) => x.userIds.length > 0);
+    expect(nonEmpty).toHaveLength(1);
+    expect(nonEmpty[0].userIds).toEqual(["@alice:hs"]);
+    expect(nonEmpty[0].roomId).toBe("!room:test");
+    expect(nonEmpty[0].ts).toBeTypeOf("number");
+
+    scope.end();
+  });
+
+  it("throttles rapid toggling to one leading and one trailing send per window", async () => {
     const scope = new ObservableScope();
     const hostBridge = mockHostBridge();
     const speaking$ = new Subject<string[]>();
 
-    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
 
     speaking$.next(["@alice:hs"]);
-    // Flush past the throttle window so the duration timer fires and
-    // _throttled resets before the empty value arrives.
-    flushTo(s, SPEAKING_THROTTLE_MS + 1);
+    speaking$.next(["@alice:hs", "@bob:hs"]);
+    speaking$.next(["@bob:hs"]);
+
+    await vi.advanceTimersByTimeAsync(SPEAKING_THROTTLE_MS + 1);
+
+    const nonEmpty = hostBridge.sent.filter((x) => x.userIds.length > 0);
+    // Leading edge emits the first value immediately; trailing edge emits the
+    // last value once the throttle window closes. No per-toggle sends.
+    expect(nonEmpty).toHaveLength(2);
+    expect(nonEmpty[0].userIds).toEqual(["@alice:hs"]);
+    expect(nonEmpty[1].userIds).toEqual(["@bob:hs"]);
+
+    scope.end();
+  });
+
+  it("re-sends a non-empty set every SPEAKING_HEARTBEAT_MS", async () => {
+    const scope = new ObservableScope();
+    const hostBridge = mockHostBridge();
+    const speaking$ = new Subject<string[]>();
+
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
+    speaking$.next(["@alice:hs"]);
+
+    await vi.advanceTimersByTimeAsync(3 * SPEAKING_HEARTBEAT_MS + 1);
+
+    const nonEmpty = hostBridge.sent.filter((x) => x.userIds.length > 0);
+    // Leading edge plus one heartbeat per 10 s: t=0, 10 s, 20 s, 30 s.
+    expect(nonEmpty).toHaveLength(4);
+    for (let i = 1; i < nonEmpty.length; i++) {
+      const gap = nonEmpty[i].ts - nonEmpty[i - 1].ts;
+      expect(gap).toBeGreaterThanOrEqual(SPEAKING_HEARTBEAT_MS - 1000);
+      expect(gap).toBeLessThanOrEqual(SPEAKING_HEARTBEAT_MS + 1000);
+    }
+
+    scope.end();
+  });
+
+  it("sends the empty set exactly once, then stays silent while idle", async () => {
+    const scope = new ObservableScope();
+    const hostBridge = mockHostBridge();
+    const speaking$ = new Subject<string[]>();
+
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
+
+    speaking$.next(["@alice:hs"]);
+    // Let the throttle window close so the empty set arrives as a fresh
+    // leading edge rather than a suppressed trailing value.
+    await vi.advanceTimersByTimeAsync(SPEAKING_THROTTLE_MS + 1);
 
     speaking$.next([]);
-    // Flush well past several heartbeat intervals — a heartbeat firing late
-    // on an empty set would show up as a second empty send here.
-    flushTo(s, SPEAKING_THROTTLE_MS + 3 * SPEAKING_HEARTBEAT_MS);
+    // Sixty idle seconds: a heartbeat firing on an empty set would show up as
+    // a second empty send here.
+    await vi.advanceTimersByTimeAsync(60_000);
 
     const emptySends = hostBridge.sent.filter((x) => x.userIds.length === 0);
     expect(emptySends).toHaveLength(1);
@@ -147,53 +124,47 @@ describe("sendSpeakingUpdates", () => {
     scope.end();
   });
 
-  it("rejects notifySpeaking: logs once then swallows", async () => {
+  it("logs once when notifySpeaking rejects twice", async () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-    const s = makeScheduler();
     const scope = new ObservableScope();
     const hostBridge = mockHostBridge();
-    (hostBridge.notifySpeaking as ReturnType<typeof vi.fn>).mockImplementation(
-      async () => {
-        throw new Error("widget rejected");
-      },
-    );
-
+    const notifySpeaking = vi.mocked(hostBridge.notifySpeaking);
+    notifySpeaking.mockRejectedValue(new Error("widget rejected"));
     const speaking$ = new Subject<string[]>();
-    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
 
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
+
+    // Leading edge rejects immediately; trailing edge rejects at window close.
     speaking$.next(["@alice:hs"]);
     speaking$.next(["@bob:hs"]);
-    flushTo(s, SPEAKING_THROTTLE_MS);
-    scope.end();
+    await vi.advanceTimersByTimeAsync(SPEAKING_THROTTLE_MS);
 
     await Promise.resolve();
     await Promise.resolve();
 
+    expect(notifySpeaking).toHaveBeenCalledTimes(2);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toBe(
       "notifySpeaking failed, further errors swallowed",
     );
+
+    scope.end();
   });
 
-  it("sends a final empty set on scope disposal", () => {
+  it("sends a final empty set on scope disposal", async () => {
     const scope = new ObservableScope();
     const hostBridge = mockHostBridge();
     const speaking$ = new Subject<string[]>();
 
     sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
     speaking$.next(["@alice:hs"]);
+    await vi.advanceTimersByTimeAsync(1);
 
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        scope.end();
+    scope.end();
 
-        const emptySends = hostBridge.sent.filter(
-          (x) => x.userIds.length === 0,
-        );
-        expect(emptySends).toHaveLength(1);
-        expect(emptySends[0].roomId).toBe("!room:test");
-        resolve();
-      }, 50);
-    });
+    const emptySends = hostBridge.sent.filter((x) => x.userIds.length === 0);
+    expect(emptySends).toHaveLength(1);
+    expect(emptySends[0].roomId).toBe("!room:test");
+    expect(emptySends[0].userIds).toEqual([]);
   });
 });

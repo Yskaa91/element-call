@@ -6,12 +6,10 @@ Please see LICENSE in the repository root for full details.
 */
 
 import {
-  asyncScheduler,
   finalize,
   map,
   type Observable,
   of,
-  type SchedulerLike,
   switchMap,
   throttleTime,
   timer,
@@ -33,17 +31,12 @@ export const SPEAKING_HEARTBEAT_MS = 10_000;
  * The heartbeat sits **downstream** of the throttle so it is never throttled
  * away. A rejected `notifySpeaking` is logged once; every later rejection is
  * swallowed.
- *
- * @param scheduler - Optional scheduler for `throttleTime` and `timer`.
- *   Defaults to `asyncScheduler` (real clock). Tests can inject a virtual
- *   scheduler to avoid real-time delays.
  */
 export function sendSpeakingUpdates(
   scope: ObservableScope,
   roomId: string,
   speaking$: Observable<string[]>,
   hostBridge: HostBridge,
-  scheduler: SchedulerLike = asyncScheduler,
 ): void {
   let errorLogged = false;
 
@@ -60,14 +53,14 @@ export function sendSpeakingUpdates(
 
   speaking$
     .pipe(
-      throttleTime(SPEAKING_THROTTLE_MS, scheduler, {
+      throttleTime(SPEAKING_THROTTLE_MS, undefined, {
         leading: true,
         trailing: true,
       }),
       switchMap((userIds) =>
         userIds.length === 0
           ? of(userIds)
-          : timer(0, SPEAKING_HEARTBEAT_MS, scheduler).pipe(map(() => userIds)),
+          : timer(0, SPEAKING_HEARTBEAT_MS).pipe(map(() => userIds)),
       ),
       scope.bind(),
       finalize(() => { send([]); }),
