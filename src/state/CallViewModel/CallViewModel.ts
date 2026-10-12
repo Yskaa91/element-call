@@ -163,6 +163,8 @@ import {
   type RingingMediaViewModel,
 } from "../media/RingingMediaViewModel.ts";
 import { type GridTileViewModel } from "../TileViewModel.ts";
+import { speakingUserIds$ } from "../../swag/speaking/speakingUsers.ts";
+import { sendSpeakingUpdates } from "../../swag/speaking/speakingUpdates.ts";
 
 //TODO
 // Larger rename
@@ -874,6 +876,9 @@ export function createCallViewModel$(
       ),
     ),
   );
+
+  // swag anchor: speaking ring
+  sendSpeakingUpdates(scope, matrixRoom.roomId, speakingUserIds$(userMedia$), hostBridge);
 
   const ringingMedia$ = scope.behavior<RingingMediaViewModel | null>(
     ringAttempts$.pipe(
