@@ -47,5 +47,11 @@ The soundboard's own tests (`SoundboardAudioProcessor.test.ts`,
 | ------------- | ------ | --- |
 | `src/state/CallViewModel/remoteMembers/ConnectionFactory.ts` | the three `…Setting.getValue()` mic-processing reads wrapped in `micProcessingOptions(readNoiseCancellationMode(), toggles)`, spread into `audioCaptureDefaults` (plus its imports) | Phase 4 noise cancellation: the single place LiveKit's microphone capture options are built. The mode setting (`src/swag/nc/mode.ts`) maps onto the toggles here — `browser` passes the toggles through, `gtcrn` forces browser noise suppression off (the GTCRN stage replaces it, Task 3), `off` disables all browser processing. `voiceIsolation` stays unset, so LiveKit's default `true` keeps the OS-level isolation. Everything the user stored as raw localStorage resolves to `browser` on an unknown value, so upgrades stay safe. |
 
+Naming note (not an anchor): the microphone graph that phase 4 splices its GTCRN stage
+into lives in `src/swag/soundboard/SoundboardAudioProcessor.ts` — the module is named for
+the soundboard because phase 2 built it there. The graph is now shared between the
+soundboard and noise cancellation. Renaming the module is deliberately deferred to phase 5;
+do not be surprised that noise-cancellation code touches a "soundboard" file.
+
 ---
 

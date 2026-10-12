@@ -11,6 +11,9 @@ import type {
   TrackProcessor,
 } from "livekit-client";
 
+import { attachDenoiseStage, type DenoiseStage } from "../nc/denoiseStage.ts";
+import { readNoiseCancellationMode } from "../nc/mode.ts";
+
 /**
  * Mixes soundboard pads into the outgoing microphone audio.
  *
@@ -27,6 +30,10 @@ import type {
  *
  * LiveKit's mute only disables the *source* microphone track, so the mixed
  * output keeps streaming while the user appears muted: pads stay audible.
+ *
+ * When the noise-cancellation mode is `gtcrn` an optional GTCRN denoise stage
+ * is spliced between `micGain` and `destination`, so only the microphone is
+ * denoised — pads connect straight to `destination` and stay out of the stage.
  */
 
 /** The gain a pad plays at when the caller does not pick one. */
@@ -51,11 +58,20 @@ export class SoundboardAudioProcessor
     gain: GainNode;
   }>();
 
+  private denoiseStage?: DenoiseStage;
+  private denoiseGeneration = 0;
+
   public async init(opts: AudioProcessorOptions): Promise<void> {
     const { track, audioContext } = opts;
     // Remember the context: LiveKit's restart path (LocalTrack's
     // setMediaStreamTrack) calls restart() without one.
     this.audioContext = audioContext;
+
+    // A new init invalidates any stage held or still attaching from an older
+    // graph, so dispose it now; the attach below starts a fresh attempt.
+    this.denoiseGeneration++;
+    this.denoiseStage?.dispose();
+    this.denoiseStage = undefined;
 
     this.destination = audioContext.createMediaStreamDestination();
     this.micSource = audioContext.createMediaStreamSource(
@@ -67,6 +83,24 @@ export class SoundboardAudioProcessor
     this.micGain.connect(this.destination);
 
     this.processedTrack = this.destination.stream.getAudioTracks()[0];
+
+    // Start the denoise attach without awaiting it: the wasm fetch must not
+    // delay the published track or the join. The generation counter lets the
+    // resolution handler discard a stage whose graph has since been torn down
+    // or rebuilt (a destroy() or a newer init()/restart()).
+    if (readNoiseCancellationMode() === "gtcrn") {
+      const generation = this.denoiseGeneration;
+      void attachDenoiseStage(audioContext, this.micGain, this.destination).then(
+        (stage) => {
+          if (!stage) return;
+          if (generation !== this.denoiseGeneration) {
+            stage.dispose();
+            return;
+          }
+          this.denoiseStage = stage;
+        },
+      );
+    }
   }
 
   public async restart(opts: AudioProcessorOptions): Promise<void> {
@@ -78,6 +112,12 @@ export class SoundboardAudioProcessor
   }
 
   public async destroy(): Promise<void> {
+    // Any stage still attaching now resolves against a graph that is about to
+    // be torn down; bumping the generation first makes it dispose itself.
+    this.denoiseGeneration++;
+    this.denoiseStage?.dispose();
+    this.denoiseStage = undefined;
+
     this.stopAllPads();
     this.micSource?.disconnect();
     this.micGain?.disconnect();
