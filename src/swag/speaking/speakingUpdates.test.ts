@@ -11,6 +11,7 @@ import { Subject } from "rxjs";
 
 import {
   sendSpeakingUpdates,
+  SPEAKING_HEARTBEAT_MS,
   SPEAKING_THROTTLE_MS,
 } from "./speakingUpdates";
 import { type HostBridge, type SpeakingState } from "../../HostBridge";
@@ -107,10 +108,19 @@ describe("sendSpeakingUpdates", () => {
         scope.end();
         const nonEmpty = hostBridge.sent.filter((x) => x.userIds.length > 0);
         expect(nonEmpty.length).toBeGreaterThanOrEqual(2);
+        // Pin periodicity: the gap between the last two sends must be
+        // approximately SPEAKING_HEARTBEAT_MS, not merely "a second send".
+        // A non-periodic timer(0) would give a gap of ~2 s (throttle trailing),
+        // failing this assertion.
+        const lastGap =
+          nonEmpty[nonEmpty.length - 1].ts -
+          nonEmpty[nonEmpty.length - 2].ts;
+        expect(lastGap).toBeGreaterThanOrEqual(SPEAKING_HEARTBEAT_MS - 1000);
+        expect(lastGap).toBeLessThanOrEqual(SPEAKING_HEARTBEAT_MS + 1000);
         resolve();
-      }, 10_500);
+      }, 13_000);
     });
-  }, 15_000);
+  }, 18_000);
 
   it("sends the empty set via leading edge, then silence (no heartbeat while idle)", () => {
     const s = makeScheduler();
@@ -124,11 +134,12 @@ describe("sendSpeakingUpdates", () => {
     flushTo(s, SPEAKING_THROTTLE_MS);
 
     speaking$.next([]);
-    flushTo(s, SPEAKING_THROTTLE_MS);
+    // Flush well past several heartbeat intervals — a heartbeat firing late
+    // on an empty set would show up as a second empty send here.
+    flushTo(s, SPEAKING_THROTTLE_MS + 3 * SPEAKING_HEARTBEAT_MS);
 
-    const countAfterEmpty = hostBridge.sent.length;
-    flushTo(s, SPEAKING_THROTTLE_MS);
-    expect(hostBridge.sent.length).toBe(countAfterEmpty);
+    const emptySends = hostBridge.sent.filter((x) => x.userIds.length === 0);
+    expect(emptySends).toHaveLength(1);
 
     scope.end();
   });
