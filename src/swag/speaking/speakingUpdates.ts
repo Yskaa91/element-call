@@ -5,7 +5,17 @@ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
 */
 
-import { finalize, map, type Observable, of, switchMap, throttleTime, timer } from "rxjs";
+import {
+  asyncScheduler,
+  finalize,
+  map,
+  type Observable,
+  of,
+  type SchedulerLike,
+  switchMap,
+  throttleTime,
+  timer,
+} from "rxjs";
 
 import { type HostBridge } from "../../HostBridge";
 import { type ObservableScope } from "../../state/ObservableScope";
@@ -23,12 +33,17 @@ export const SPEAKING_HEARTBEAT_MS = 10_000;
  * The heartbeat sits **downstream** of the throttle so it is never throttled
  * away. A rejected `notifySpeaking` is logged once; every later rejection is
  * swallowed.
+ *
+ * @param scheduler - Optional scheduler for `throttleTime` and `timer`.
+ *   Defaults to `asyncScheduler` (real clock). Tests can inject a virtual
+ *   scheduler to avoid real-time delays.
  */
 export function sendSpeakingUpdates(
   scope: ObservableScope,
   roomId: string,
   speaking$: Observable<string[]>,
   hostBridge: HostBridge,
+  scheduler: SchedulerLike = asyncScheduler,
 ): void {
   let errorLogged = false;
 
@@ -45,17 +60,17 @@ export function sendSpeakingUpdates(
 
   speaking$
     .pipe(
-      throttleTime(SPEAKING_THROTTLE_MS, undefined, {
+      throttleTime(SPEAKING_THROTTLE_MS, scheduler, {
         leading: true,
         trailing: true,
       }),
       switchMap((userIds) =>
         userIds.length === 0
           ? of(userIds)
-          : timer(0, SPEAKING_HEARTBEAT_MS).pipe(map(() => userIds)),
+          : timer(0, SPEAKING_HEARTBEAT_MS, scheduler).pipe(map(() => userIds)),
       ),
       scope.bind(),
-      finalize(() => void send([])),
+      finalize(() => { send([]); }),
     )
     .subscribe((userIds) => send(userIds));
 }

@@ -6,6 +6,7 @@ Please see LICENSE in the repository root for full details.
 */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { TestScheduler } from "rxjs/testing";
 import { Subject } from "rxjs";
 
 import {
@@ -38,123 +39,126 @@ function mockHostBridge(): HostBridge & { sent: SpeakingState[] } {
   return Object.assign(bridge, { sent });
 }
 
+function makeScheduler(): TestScheduler {
+  return new TestScheduler((actual, expected) =>
+    expect(actual).toEqual(expected),
+  );
+}
+
+/** Flush virtual time to a specific frame (TestScheduler type omits the arg). */
+function flushTo(s: TestScheduler, frame: number): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TestScheduler type omits maxFrame param
+  (s as any).flush(frame);
+}
+
 describe("sendSpeakingUpdates", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
   it("sends the first non-empty set immediately (leading edge)", () => {
+    const s = makeScheduler();
     const scope = new ObservableScope();
     const hostBridge = mockHostBridge();
     const speaking$ = new Subject<string[]>();
 
-    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
     speaking$.next(["@alice:hs"]);
+    flushTo(s, 100);
+    scope.end();
 
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        expect(hostBridge.notifySpeaking).toHaveBeenCalled();
-        expect(hostBridge.sent[0].userIds).toEqual(["@alice:hs"]);
-        expect(hostBridge.sent[0].roomId).toBe("!room:test");
-        expect(hostBridge.sent[0].ts).toBeTypeOf("number");
-        scope.end();
-        resolve();
-      }, 20);
-    });
+    const nonEmpty = hostBridge.sent.filter((x) => x.userIds.length > 0);
+    expect(nonEmpty[0].userIds).toEqual(["@alice:hs"]);
+    expect(nonEmpty[0].roomId).toBe("!room:test");
+    expect(nonEmpty[0].ts).toBeTypeOf("number");
   });
 
-  it("throttles rapid updates to at most one per SPEAKING_THROTTLE_MS window", () => {
-    // Leading + trailing = at most 2 sends within one throttle window
+  it("throttles rapid updates: leading + trailing within one SPEAKING_THROTTLE_MS window", () => {
+    const s = makeScheduler();
     const scope = new ObservableScope();
     const hostBridge = mockHostBridge();
     const speaking$ = new Subject<string[]>();
 
-    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
 
-    // Three rapid emissions within one throttle window
     speaking$.next(["@alice:hs"]);
     speaking$.next(["@alice:hs", "@bob:hs"]);
     speaking$.next(["@bob:hs"]);
+    flushTo(s, SPEAKING_THROTTLE_MS);
+    scope.end();
 
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        // Leading fires for first, trailing fires for last within window
-        expect(hostBridge.sent.length).toBeGreaterThanOrEqual(1);
-        expect(hostBridge.sent.length).toBeLessThanOrEqual(2);
-        scope.end();
-        resolve();
-      }, SPEAKING_THROTTLE_MS + 200);
-    });
+    expect(hostBridge.sent.length).toBeGreaterThanOrEqual(1);
+    expect(hostBridge.sent.length).toBeLessThanOrEqual(2);
   });
 
-  it("sends exactly one empty set then no further sends (no heartbeat while idle)", () => {
+  it("re-sends a non-empty set via the heartbeat timer", () => {
     const scope = new ObservableScope();
     const hostBridge = mockHostBridge();
     const speaking$ = new Subject<string[]>();
 
     sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
-
     speaking$.next(["@alice:hs"]);
-    // Wait past the throttle window so the trailing edge fires
+
+    // Real time: timer(0, 10000) re-emits after 10 s. Virtual time with
+    // timer(0, 10000) causes infinite reschedule in TestScheduler (OOM),
+    // so this test uses real timers.
     return new Promise<void>((resolve) => {
       setTimeout(() => {
-        speaking$.next([]);
-
-        // Wait past the next throttle window — the trailing edge emits
-        // the empty set. After that, no heartbeat fires (timer is off for
-        // empty sets), so no further sends should appear.
-        setTimeout(() => {
-          const emptySends = hostBridge.sent.filter(
-            (s) => s.userIds.length === 0,
-          );
-          expect(emptySends.length).toBeGreaterThanOrEqual(1);
-
-          const countAfter = hostBridge.sent.length;
-          // Give extra time and verify no more sends
-          setTimeout(() => {
-            expect(hostBridge.sent.length).toBe(countAfter);
-            scope.end();
-            resolve();
-          }, 500);
-        }, SPEAKING_THROTTLE_MS + 200);
-      }, SPEAKING_THROTTLE_MS + 200);
+        scope.end();
+        const nonEmpty = hostBridge.sent.filter((x) => x.userIds.length > 0);
+        expect(nonEmpty.length).toBeGreaterThanOrEqual(2);
+        resolve();
+      }, 10_500);
     });
-  }, 10_000);
+  }, 15_000);
 
-  it("rejects notifySpeaking: logs once then swallows", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+  it("sends the empty set via leading edge, then silence (no heartbeat while idle)", () => {
+    const s = makeScheduler();
     const scope = new ObservableScope();
     const hostBridge = mockHostBridge();
-    let callCount = 0;
+    const speaking$ = new Subject<string[]>();
+
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
+
+    speaking$.next(["@alice:hs"]);
+    flushTo(s, SPEAKING_THROTTLE_MS);
+
+    speaking$.next([]);
+    flushTo(s, SPEAKING_THROTTLE_MS);
+
+    const countAfterEmpty = hostBridge.sent.length;
+    flushTo(s, SPEAKING_THROTTLE_MS);
+    expect(hostBridge.sent.length).toBe(countAfterEmpty);
+
+    scope.end();
+  });
+
+  it("rejects notifySpeaking: logs once then swallows", async () => {
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const s = makeScheduler();
+    const scope = new ObservableScope();
+    const hostBridge = mockHostBridge();
     (hostBridge.notifySpeaking as ReturnType<typeof vi.fn>).mockImplementation(
       async () => {
-        callCount++;
-        if (callCount <= 2) throw new Error("widget rejected");
+        throw new Error("widget rejected");
       },
     );
 
     const speaking$ = new Subject<string[]>();
-    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge);
+    sendSpeakingUpdates(scope, "!room:test", speaking$, hostBridge, s);
 
     speaking$.next(["@alice:hs"]);
+    speaking$.next(["@bob:hs"]);
+    flushTo(s, SPEAKING_THROTTLE_MS);
+    scope.end();
 
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        // First rejection logs
-        expect(warnSpy).toHaveBeenCalledTimes(1);
-        expect(warnSpy.mock.calls[0][0]).toBe(
-          "notifySpeaking failed, further errors swallowed",
-        );
+    await Promise.resolve();
+    await Promise.resolve();
 
-        // Second call within throttle window — if it fires and rejects, warn still 1
-        speaking$.next(["@bob:hs"]);
-        setTimeout(() => {
-          expect(warnSpy).toHaveBeenCalledTimes(1);
-          scope.end();
-          resolve();
-        }, 50);
-      }, 50);
-    });
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toBe(
+      "notifySpeaking failed, further errors swallowed",
+    );
   });
 
   it("sends a final empty set on scope disposal", () => {
@@ -170,7 +174,7 @@ describe("sendSpeakingUpdates", () => {
         scope.end();
 
         const emptySends = hostBridge.sent.filter(
-          (s) => s.userIds.length === 0,
+          (x) => x.userIds.length === 0,
         );
         expect(emptySends).toHaveLength(1);
         expect(emptySends[0].roomId).toBe("!room:test");

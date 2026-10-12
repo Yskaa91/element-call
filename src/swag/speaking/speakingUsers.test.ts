@@ -84,6 +84,48 @@ describe("speakingUserIds$", () => {
     });
   });
 
+  it("filters to the one speaker when two users are present but only one speaks", () => {
+    scheduler().run(({ cold, expectObservable }) => {
+      const alice$ = cold("a-", {
+        a: false,
+      }) as unknown as Observable<boolean>;
+      const bob$ = cold("a-", {
+        a: true,
+      }) as unknown as Observable<boolean>;
+      const media: SpeakingUserMedia[] = [
+        { userId: "@alice:hs", speaking$: alice$ },
+        { userId: "@bob:hs", speaking$: bob$ },
+      ];
+      const userMedia$ = cold("a-", { a: media });
+      const result$ = speakingUserIds$(userMedia$);
+      expectObservable(result$).toBe("a-", { a: ["@bob:hs"] });
+    });
+  });
+
+  it("re-subscribes when the media list changes (switchMap)", () => {
+    scheduler().run(({ cold, expectObservable }) => {
+      const alice$ = cold("a-", {
+        a: true,
+      }) as unknown as Observable<boolean>;
+      const bob$ = cold("a-", {
+        a: true,
+      }) as unknown as Observable<boolean>;
+      const first: SpeakingUserMedia[] = [
+        { userId: "@alice:hs", speaking$: alice$ },
+      ];
+      const second: SpeakingUserMedia[] = [
+        { userId: "@bob:hs", speaking$: bob$ },
+      ];
+      // Membership change at frame 2: alice → bob
+      const userMedia$ = cold("a-b-", { a: first, b: second });
+      const result$ = speakingUserIds$(userMedia$);
+      expectObservable(result$).toBe("a-b-", {
+        a: ["@alice:hs"],
+        b: ["@bob:hs"],
+      });
+    });
+  });
+
   it("deduplicates identical consecutive sets", () => {
     scheduler().run(({ cold, expectObservable }) => {
       const alice$ = cold("aa-", {
