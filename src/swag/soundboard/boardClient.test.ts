@@ -29,6 +29,7 @@ const SPACE_ID = "!space:example.org";
 const SOUND: SoundboardSound = {
   id: "one",
   name: "Air horn",
+  emoji: "📯",
   mxc: "mxc://example.org/airhorn",
   mimetype: "audio/ogg",
   size: 1234,
@@ -51,6 +52,7 @@ function boardEvent(): IRoomEvent {
         {
           id: SOUND.id,
           name: SOUND.name,
+          emoji: SOUND.emoji,
           mxc: SOUND.mxc,
           mimetype: SOUND.mimetype,
           size: SOUND.size,
@@ -193,11 +195,12 @@ describe("SoundboardClient.save", () => {
       SOUNDBOARD_EVENT_TYPE,
       "",
       {
-        version: 1,
+        version: 2,
         sounds: [
           {
             id: SOUND.id,
             name: SOUND.name,
+            emoji: SOUND.emoji,
             mxc: SOUND.mxc,
             mimetype: SOUND.mimetype,
             size: SOUND.size,

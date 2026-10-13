@@ -245,6 +245,9 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
             0,
             MAX_STORED_NAME_LENGTH,
           ),
+          // The standalone panel has no emoji picker; v1-style empty emoji
+          // keeps the schema valid until Task 5 removes this panel.
+          emoji: "",
           mxc: uploaded.mxc,
           mimetype: uploaded.mimetype,
           size: uploaded.size,

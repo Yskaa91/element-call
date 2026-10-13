@@ -22,6 +22,7 @@ function sound(overrides: Partial<SoundboardSound> = {}): SoundboardSound {
   return {
     id: "one",
     name: "Air horn",
+    emoji: "📯",
     mxc: "mxc://example.org/airhorn",
     mimetype: "audio/ogg",
     size: 1234,
@@ -37,6 +38,7 @@ function wireSound(overrides: Record<string, unknown> = {}): Record<string, unkn
   return {
     id: "one",
     name: "Air horn",
+    emoji: "📯",
     mxc: "mxc://example.org/airhorn",
     mimetype: "audio/ogg",
     size: 1234,
@@ -147,6 +149,36 @@ describe("parseBoard", () => {
     );
     expect(parseBoard({ version: 1, sounds })).toHaveLength(SOUNDBOARD_LIMITS.maxSounds);
   });
+
+  it("round-trips the emoji through serialize and parse", () => {
+    const board = [sound({ emoji: "🥁" })];
+    expect(parseBoard(serializeBoard(board))).toEqual(board);
+  });
+
+  it("maps a missing emoji (v1 board) to an empty string", () => {
+    const { emoji: _emoji, ...withoutEmoji } = wireSound();
+    const board = parseBoard({ version: 1, sounds: [withoutEmoji] });
+    expect(board).toHaveLength(1);
+    expect(board[0].emoji).toBe("");
+  });
+
+  it("drops entries with a non-string or over-long emoji", () => {
+    const board = parseBoard({
+      version: 2,
+      sounds: [
+        wireSound({ id: "bad-type", emoji: 42 }),
+        wireSound({ id: "too-long", emoji: "a".repeat(9) }),
+        wireSound({ id: "ok", emoji: "👍" }),
+      ],
+    });
+    expect(board.map((entry) => entry.id)).toEqual(["ok"]);
+  });
+
+  it("still parses version 1 content", () => {
+    const board = parseBoard({ version: 1, sounds: [wireSound({ emoji: "📯" })] });
+    expect(board).toHaveLength(1);
+    expect(board[0].emoji).toBe("📯");
+  });
 });
 
 describe("serializeBoard", () => {
@@ -156,7 +188,7 @@ describe("serializeBoard", () => {
   });
 
   it("writes the agreed content shape", () => {
-    expect(serializeBoard([sound()])).toEqual({ version: 1, sounds: [wireSound()] });
+    expect(serializeBoard([sound()])).toEqual({ version: 2, sounds: [wireSound()] });
   });
 
   it("rounds a fractional duration to an integer: Matrix content must not contain floats", () => {

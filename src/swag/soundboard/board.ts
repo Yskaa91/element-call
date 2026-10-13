@@ -21,6 +21,8 @@ export const SOUNDBOARD_EVENT_TYPE = "io.element.call.soundboard";
 export interface SoundboardSound {
   id: string;
   name: string;
+  /** Single emoji shown on the Reactions board. Empty for pre-emoji v1 pads. */
+  emoji: string;
   mxc: string;
   mimetype: string;
   size: number;
@@ -40,6 +42,7 @@ export const SOUNDBOARD_LIMITS = {
 interface WireSound {
   id: string;
   name: string;
+  emoji?: string;
   mxc: string;
   mimetype: string;
   size: number;
@@ -50,7 +53,7 @@ interface WireSound {
 
 /** The on-the-wire board content. */
 export interface SoundboardBoardContent {
-  version: 1;
+  version: 2;
   sounds: WireSound[];
 }
 
@@ -63,6 +66,7 @@ function parseSound(entry: unknown): SoundboardSound | null {
   const {
     id,
     name,
+    emoji,
     mxc,
     mimetype,
     size,
@@ -72,6 +76,10 @@ function parseSound(entry: unknown): SoundboardSound | null {
   } = entry as Record<string, unknown>;
   if (typeof id !== "string" || id.length === 0) return null;
   if (typeof name !== "string") return null;
+  // v1 boards predate the emoji field: map a missing emoji to "" so old pads
+  // keep parsing (the menu hides them until edited). A present emoji must be
+  // a short string; anything else is hostile and dropped.
+  if (emoji !== undefined && (typeof emoji !== "string" || emoji.length === 0 || emoji.length > 8)) return null;
   if (typeof mxc !== "string") return null;
   if (typeof mimetype !== "string") return null;
   if (!isFiniteNumber(size) || size < 0) return null;
@@ -83,7 +91,7 @@ function parseSound(entry: unknown): SoundboardSound | null {
   if (durationMs > SOUNDBOARD_LIMITS.maxDurationMs) return null;
   if (typeof addedBy !== "string") return null;
   if (!isFiniteNumber(addedTs)) return null;
-  return { id, name, mxc, mimetype, size, durationMs, addedBy, addedTs };
+  return { id, name, emoji: typeof emoji === "string" ? emoji : "", mxc, mimetype, size, durationMs, addedBy, addedTs };
 }
 
 /**
@@ -111,10 +119,11 @@ export function parseBoard(content: unknown): SoundboardSound[] {
 /** Writes a board in the shape `parseBoard` reads back. */
 export function serializeBoard(sounds: SoundboardSound[]): SoundboardBoardContent {
   return {
-    version: 1,
+    version: 2,
     sounds: sounds.map((sound) => ({
       id: sound.id,
       name: sound.name,
+      emoji: sound.emoji,
       mxc: sound.mxc,
       mimetype: sound.mimetype,
       size: sound.size,
