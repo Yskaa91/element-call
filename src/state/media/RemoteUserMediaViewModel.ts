@@ -13,6 +13,10 @@ import { logger } from "matrix-js-sdk/lib/logger";
 import { type Behavior } from "../Behavior";
 import { createVolumeControls, type VolumeControls } from "../VolumeControls";
 import {
+  readStoredVolume,
+  writeStoredVolume,
+} from "../../../swag/volume/playbackVolumes";
+import {
   type BaseUserMediaInputs,
   type BaseUserMediaViewModel,
   createBaseUserMedia,
@@ -67,6 +71,9 @@ export function createRemoteUserMedia(
       sink$: scope.behavior(
         inputs.participant$.pipe(map((p) => (volume) => p?.setVolume(volume))),
       ),
+      // Swag anchor: receiver volumes persist per user across sessions.
+      initialVolume: readStoredVolume(inputs.userId),
+      onCommittedVolume: (volume) => writeStoredVolume(inputs.userId, volume),
     }),
     local: false,
     speaking$: scope.behavior(

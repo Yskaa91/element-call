@@ -5,6 +5,14 @@ touched only by *anchors*: a registration line, a capability request, a render s
 should be larger than about 20 lines. This file records every anchor and why it exists, and is updated
 in the same commit as the anchor. Rebases should conflict here, and in the anchors, and nowhere else.
 
+## Anchors added for receiver volume memory
+
+| Upstream file | Anchor | Why |
+| ------------- | ------ | --- |
+| `src/state/VolumeControls.ts` | optional `initialVolume` / `onCommittedVolume` inputs: the accumulate seed starts from `initialVolume`, and each committed slider value is reported through `onCommittedVolume` (mute toggles never are) | Receiver volumes persist per user: the slider, mute toggle and LiveKit `setVolume` sink already existed, only the memory was missing. The storage itself lives in `src/swag/volume/playbackVolumes.ts` (localStorage map, mute never stored). |
+| `src/state/media/RemoteUserMediaViewModel.ts` | `initialVolume: readStoredVolume(inputs.userId)` + `onCommittedVolume` writing back (plus the import) | Voice volume memory, keyed by Matrix user ID. |
+| `src/state/media/RemoteScreenShareViewModel.ts` | same two lines (plus the import) | Screen-share audio shares the same per-user memory. |
+
 ## Anchors added by phase 3 (speaking ring)
 
 | Upstream file  | Anchor | Why |

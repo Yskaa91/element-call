@@ -17,6 +17,10 @@ import {
 } from "./ScreenShareViewModel";
 import { type ObservableScope } from "../ObservableScope";
 import { createVolumeControls, type VolumeControls } from "../VolumeControls";
+import {
+  readStoredVolume,
+  writeStoredVolume,
+} from "../../../swag/volume/playbackVolumes";
 import { observeTrackReference$ } from "../observeTrackReference";
 
 export interface RemoteScreenShareViewModel
@@ -53,6 +57,9 @@ export function createRemoteScreenShare(
           ),
         ),
       ),
+      // Swag anchor: receiver volumes persist per user across sessions.
+      initialVolume: readStoredVolume(inputs.userId),
+      onCommittedVolume: (volume) => writeStoredVolume(inputs.userId, volume),
     }),
     local: false,
     videoEnabled$: scope.behavior(
