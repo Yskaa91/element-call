@@ -97,8 +97,10 @@ describe("parseBoard", () => {
   });
 
   it("drops entries with missing fields", () => {
-    const { name: _name, ...withoutName } = wireSound();
-    const { mxc: _mxc, ...withoutMxc } = wireSound();
+    const withoutName = wireSound();
+    delete withoutName.name;
+    const withoutMxc = wireSound();
+    delete withoutMxc.mxc;
     const board = parseBoard({ version: 1, sounds: [withoutName, withoutMxc] });
     expect(board).toEqual([]);
   });
@@ -168,7 +170,8 @@ describe("parseBoard", () => {
   });
 
   it("maps a missing emoji (v1 board) to an empty string", () => {
-    const { emoji: _emoji, ...withoutEmoji } = wireSound();
+    const withoutEmoji = wireSound();
+    delete withoutEmoji.emoji;
     const board = parseBoard({ version: 1, sounds: [withoutEmoji] });
     expect(board).toHaveLength(1);
     expect(board[0].emoji).toBe("");

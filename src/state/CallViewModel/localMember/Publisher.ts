@@ -33,7 +33,6 @@ import {
 import { observeTrackReference$ } from "../../observeTrackReference";
 import { type Connection } from "../remoteMembers/Connection.ts";
 import { ObservableScope } from "../../ObservableScope.ts";
-import { observeSoundboardProcessor } from "../../../swag/soundboard/observeSoundboardProcessor.ts";
 
 /**
  * A wrapper for a Connection object.
@@ -76,8 +75,6 @@ export class Publisher {
 
     // Setup track processor syncing (blur)
     this.observeTrackProcessors(this.scope, room, trackerProcessorState$);
-    // Mix soundboard pads into the microphone track (src/swag/soundboard)
-    observeSoundboardProcessor(this.scope, room, this.logger);
     // Observe media device changes and update LiveKit active devices accordingly
     this.observeMediaDevices(this.scope, devices, controlledAudioDevices);
 
@@ -164,10 +161,8 @@ export class Publisher {
   }
   /**
    * Create and setup local audio and video tracks based on the current mute states.
-   * The microphone track is always created, even when muted, so the soundboard
-   * has a published track to mix pads into; it is muted immediately after being
-   * created. The camera track is only created when video is enabled, to avoid an
-   * unnecessary permission prompt.
+   * It creates the tracks only if audio and/or video is enabled, to avoid unnecessary
+   * permission prompts.
    *
    * It also observes mute state changes to update LiveKit microphone/camera states accordingly.
    * If a track is not created initially because disabled, it will be created when unmuting.
@@ -182,9 +177,8 @@ export class Publisher {
     // Observe mute state changes and update LiveKit microphone/camera states accordingly
     this.observeMuteStates();
 
-    // The microphone track is always created (muted if needed, see below) so
-    // the soundboard has something to mix pads into; the camera is only created
-    // when enabled, because it could prompt for permission unnecessarily.
+    // Check if audio and/or video is enabled. We only create tracks if enabled,
+    // because it could prompt for permission, and we don't want to do that unnecessarily.
     const audio = this.muteStates.audio.enabled$.value;
     const video = this.muteStates.video.enabled$.value;
 
@@ -200,26 +194,8 @@ export class Publisher {
       void lkRoom.localParticipant.enableCameraAndMicrophone();
     } else if (audio) {
       void lkRoom.localParticipant.setMicrophoneEnabled(true);
-    } else {
-      // Always create the microphone track, even when joining muted: the
-      // soundboard mixes pads into it (src/swag/soundboard), so a muted user
-      // still needs a published track for others to hear their pads through.
-      // Create it and then mute it, so no microphone audio leaves the device
-      // while the user is muted.
-      void lkRoom.localParticipant
-        .setMicrophoneEnabled(true)
-        .then(() => {
-          if (!this.muteStates.audio.enabled$.value) {
-            return lkRoom.localParticipant.setMicrophoneEnabled(false);
-          }
-          return undefined;
-        })
-        .catch((e) =>
-          this.logger.error("Failed to create the muted microphone track", e),
-        );
-      if (video) {
-        void lkRoom.localParticipant.setCameraEnabled(true);
-      }
+    } else if (video) {
+      void lkRoom.localParticipant.setCameraEnabled(true);
     }
 
     return Promise.resolve();

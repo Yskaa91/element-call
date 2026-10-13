@@ -15,9 +15,9 @@ export const GTCRN_PROCESSOR_ID = "@sapphi-red/web-noise-suppressor/gtcrn";
 
 /**
  * Contexts where `addModule` has already completed successfully. Re-registering
- * a processor id on one context throws, and `SoundboardAudioProcessor`
- * reuses its `AudioContext` across restarts, so the second attach in `gtcrn`
- * mode would otherwise fail and silently leave the mic undenoised.
+ * a processor id on one context throws, and contexts reused across restarts
+ * (as the old soundboard's shared context was) would otherwise fail the
+ * second attach in `gtcrn` mode and silently leave the mic undenoised.
  */
 const registeredWorkletContexts = new WeakSet<AudioContext>();
 

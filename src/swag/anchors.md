@@ -79,3 +79,11 @@ do not be surprised that noise-cancellation code touches a "soundboard" file.
 
 | `src/room/ReactionAudioRenderer.tsx` | custom pad buffers merged into the audio engine + `roomId` prop | Receipt-side playback: custom reactions resolve by name to MXC buffers (`src/swag/reactions/customSoundCache.ts`), unknown names fall back to generic. |
 | `src/room/InCallView.tsx` | `roomId={matrixRoom.roomId}` on `<ReactionsAudioRenderer>` | The renderer needs the call room to find its space board. |
+
+## Anchors removed by the Reactions board merge
+
+- `src/room/InCallView.tsx`: `<SoundboardPanel>` footer + narrow slots — the Reactions menu is the board now.
+- `src/components/CallFooter.tsx`: `narrowChildren` prop — only the panel used it.
+- `src/state/CallViewModel/localMember/Publisher.ts`: `observeSoundboardProcessor` hook + always-create-muted-mic — receipt-side playback needs no mic track. Reverted to upstream `v0.26.1`.
+- Deleted: `SoundboardPanel.*`, `SoundboardAudioProcessor.*`, `observeSoundboardProcessor.*`, `processorHandle.ts`. Kept: `board.ts`, `boardClient.ts`, `decodeAudio.ts`, `SoundboardWidgetContext.tsx` (the Reactions board's storage + upload path).
+- `locales/en/app.json`: orphaned `soundboard.*` keys removed; board strings are inline in `src/swag/reactions/`.

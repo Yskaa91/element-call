@@ -91,7 +91,6 @@ import { type DeveloperSettingsSnapshot } from "../settings/DeveloperSettingsTab
 import { type ViewModel } from "../state/ViewModel.ts";
 import { RingingStatus } from "../tile/RingingStatus.tsx";
 import { RingingAudioRenderer } from "./RingingAudioRenderer.tsx";
-import { SoundboardPanel } from "../swag/soundboard/SoundboardPanel.tsx";
 
 declare module "react" {
   interface CSSProperties {
@@ -649,20 +648,7 @@ export const InCallView: FC<InCallViewProps> = ({
 
   // Only hide the settings button if we have an AppBar header and we are showing the header
   const footer = footerVm !== null && (
-    <CallFooter
-      className={styles.footer}
-      ref={footerRef}
-      vm={footerVm}
-      // The settings slot is hidden below 500px; this keeps the panel reachable.
-      narrowChildren={
-        <SoundboardPanel
-          roomId={matrixRoom.roomId}
-          testIdPrefix="soundboard-narrow"
-        />
-      }
-    >
-      <SoundboardPanel roomId={matrixRoom.roomId} />
-    </CallFooter>
+    <CallFooter className={styles.footer} ref={footerRef} vm={footerVm} />
   );
   const allConnections = useBehavior(vm.allConnections$);
 
@@ -694,7 +680,11 @@ export const InCallView: FC<InCallViewProps> = ({
       ))}
       {renderContent()}
       <CallEventAudioRenderer vm={vm} muted={muteAllAudio} />
-      <ReactionsAudioRenderer vm={vm} muted={muteAllAudio} roomId={matrixRoom.roomId} />
+      <ReactionsAudioRenderer
+        vm={vm}
+        muted={muteAllAudio}
+        roomId={matrixRoom.roomId}
+      />
       <RingingAudioRenderer vm={ringingVm} muted={muteAllAudio} />
       {reconnectingToast}
       {screenShareToast}
