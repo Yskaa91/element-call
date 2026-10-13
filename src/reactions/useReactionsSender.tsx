@@ -25,6 +25,8 @@ import { useBehavior } from "../useBehavior";
 
 interface ReactionsSenderContextType {
   supportsReactions: boolean;
+  /** The call room the widget is in: the space board is resolved from it. */
+  roomId: string;
   toggleRaisedHand: () => Promise<void>;
   sendReaction: (reaction: ReactionOption) => Promise<void>;
 }
@@ -160,6 +162,7 @@ export const ReactionsSenderProvider = ({
     <ReactionsSenderContext
       value={{
         supportsReactions,
+        roomId: rtcSession.room.roomId,
         toggleRaisedHand,
         sendReaction,
       }}

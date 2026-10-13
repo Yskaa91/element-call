@@ -124,7 +124,9 @@ const NOTIFY_CAPABILITIES_ACTION = `action:${WidgetApiToWidgetAction.NotifyCapab
  */
 async function grantCapabilities(api: MockApi): Promise<void> {
   await flushPromises();
-  const call = api.on.mock.calls.find(([name]) => name === NOTIFY_CAPABILITIES_ACTION);
+  const call = api.on.mock.calls.find(
+    ([name]) => name === NOTIFY_CAPABILITIES_ACTION,
+  );
   expect(call, "the client must wait for notify_capabilities").toBeDefined();
   (call![1] as () => void)();
 }
@@ -136,7 +138,12 @@ describe("SoundboardClient.load", () => {
 
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
     await expect(client.load()).resolves.toEqual([SOUND]);
-    expect(api.readStateEvents).toHaveBeenCalledWith(SOUNDBOARD_EVENT_TYPE, undefined, undefined, [SPACE_ID]);
+    expect(api.readStateEvents).toHaveBeenCalledWith(
+      SOUNDBOARD_EVENT_TYPE,
+      undefined,
+      undefined,
+      [SPACE_ID],
+    );
   });
 
   it("returns an empty board when the space has no board event", async () => {
@@ -149,7 +156,9 @@ describe("SoundboardClient.load", () => {
 
   it("surfaces a refused read as a typed error, not an empty board", async () => {
     const api = mockApi();
-    api.readStateEvents.mockRejectedValue(new Error("Unable to access room timeline"));
+    api.readStateEvents.mockRejectedValue(
+      new Error("Unable to access room timeline"),
+    );
 
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
     await expect(client.load()).rejects.toBeInstanceOf(SoundboardError);
@@ -159,9 +168,13 @@ describe("SoundboardClient.load", () => {
 describe("SoundboardClient.upload", () => {
   it("returns the mxc and the file's type and size", async () => {
     const api = mockApi();
-    api.uploadFile.mockResolvedValue({ content_uri: "mxc://example.org/uploaded" });
+    api.uploadFile.mockResolvedValue({
+      content_uri: "mxc://example.org/uploaded",
+    });
 
-    const file = new File([new Uint8Array(1234)], "horn.ogg", { type: "audio/ogg" });
+    const file = new File([new Uint8Array(1234)], "horn.ogg", {
+      type: "audio/ogg",
+    });
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
 
     await expect(client.upload(file)).resolves.toEqual({
@@ -177,16 +190,19 @@ describe("SoundboardClient.upload", () => {
     api.uploadFile.mockRejectedValue(new Error("nope"));
 
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
-    await expect(client.upload(new File([], "horn.ogg", { type: "audio/ogg" }))).rejects.toBeInstanceOf(
-      SoundboardError,
-    );
+    await expect(
+      client.upload(new File([], "horn.ogg", { type: "audio/ogg" })),
+    ).rejects.toBeInstanceOf(SoundboardError);
   });
 });
 
 describe("SoundboardClient.save", () => {
   it("sends the board to the space room with the empty state key", async () => {
     const api = mockApi();
-    api.sendStateEvent.mockResolvedValue({ room_id: SPACE_ID, event_id: "$saved" });
+    api.sendStateEvent.mockResolvedValue({
+      room_id: SPACE_ID,
+      event_id: "$saved",
+    });
 
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
     await client.save([SOUND]);
@@ -235,7 +251,9 @@ describe("SoundboardClient.subscribe", () => {
       expect.any(Function),
     );
 
-    const handler = api.on.mock.calls[0][1] as (ev: CustomEvent<IWidgetApiRequest>) => void;
+    const handler = api.on.mock.calls[0][1] as (
+      ev: CustomEvent<IWidgetApiRequest>,
+    ) => void;
     const event = updateStateEvent([boardEvent()]);
     handler(event);
 
@@ -251,7 +269,9 @@ describe("SoundboardClient.subscribe", () => {
     const callback = vi.fn();
 
     client.subscribe(callback);
-    const handler = api.on.mock.calls[0][1] as (ev: CustomEvent<IWidgetApiRequest>) => void;
+    const handler = api.on.mock.calls[0][1] as (
+      ev: CustomEvent<IWidgetApiRequest>,
+    ) => void;
     handler(updateStateEvent([{ ...boardEvent(), type: "m.room.name" }]));
 
     expect(callback).not.toHaveBeenCalled();
@@ -277,7 +297,12 @@ describe("resolveSpaceRoomId", () => {
     api.readStateEvents.mockResolvedValue([spaceParentEvent()]);
 
     await expect(resolveSpaceRoomId(api, ROOM_ID)).resolves.toBe(SPACE_ID);
-    expect(api.readStateEvents).toHaveBeenCalledWith(EventType.SpaceParent, undefined, undefined, [ROOM_ID]);
+    expect(api.readStateEvents).toHaveBeenCalledWith(
+      EventType.SpaceParent,
+      undefined,
+      undefined,
+      [ROOM_ID],
+    );
   });
 
   it("prefers the canonical parent over the first one", async () => {
@@ -330,8 +355,12 @@ describe("createSoundboardClient", () => {
     expect(client).toBeInstanceOf(SoundboardClient);
     expect(client?.spaceRoomId).toBe(SPACE_ID);
     expect(api.requestCapabilityForRoomTimeline).toHaveBeenCalledWith(SPACE_ID);
-    expect(api.requestCapabilityToReceiveState).toHaveBeenCalledWith(SOUNDBOARD_EVENT_TYPE);
-    expect(api.requestCapabilityToSendState).toHaveBeenCalledWith(SOUNDBOARD_EVENT_TYPE);
+    expect(api.requestCapabilityToReceiveState).toHaveBeenCalledWith(
+      SOUNDBOARD_EVENT_TYPE,
+    );
+    expect(api.requestCapabilityToSendState).toHaveBeenCalledWith(
+      SOUNDBOARD_EVENT_TYPE,
+    );
     expect(api.updateRequestedCapabilities).toHaveBeenCalled();
   });
 

@@ -33,6 +33,7 @@ const ROOM_ID = "!call:example.org";
 const SOUND: SoundboardSound = {
   id: "one",
   name: "Air horn",
+  emoji: "📯",
   mxc: "mxc://example.org/airhorn",
   mimetype: "audio/ogg",
   size: 1234,
@@ -108,8 +109,7 @@ describe("panel layout", () => {
     expect(title).toHaveTextContent("Soundboard");
     // Title first, then the upload form, then the sounds.
     expect(
-      title.compareDocumentPosition(upload) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      title.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
       upload.compareDocumentPosition(pads) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -239,7 +239,9 @@ describe("SoundboardPanel", () => {
 
   it("shows an error and leaves the board unchanged when the upload fails", async () => {
     const client = makeClient({
-      upload: vi.fn().mockRejectedValue(new Error("Could not upload the sound")),
+      upload: vi
+        .fn()
+        .mockRejectedValue(new Error("Could not upload the sound")),
     });
     vi.mocked(createSoundboardClient).mockResolvedValue(client as never);
     renderPanel();
@@ -295,7 +297,10 @@ describe("SoundboardPanel", () => {
     renderPanel();
     await openPanel();
 
-    await userEvent.type(screen.getByTestId("soundboard-name"), "Airhorn blast");
+    await userEvent.type(
+      screen.getByTestId("soundboard-name"),
+      "Airhorn blast",
+    );
     await userEvent.upload(
       screen.getByTestId("soundboard-file"),
       soundFile("riser-hit-sfx-001.mp3"),

@@ -67,3 +67,12 @@ do not be surprised that noise-cancellation code touches a "soundboard" file.
 
 ---
 
+
+## Anchors added for the Reactions board merge
+
+| Upstream file | Anchor | Why |
+| ------------- | ------ | --- |
+| `src/reactions/useReactionsSender.tsx` | `roomId` in `ReactionsSenderContextType` + value | The custom board lives in the call room's space; the menu needs the room id and the provider already owns the session. |
+| `src/button/ReactionToggleButton.tsx` | edit toggle, custom pads, plus button, add + confirm-delete dialogs in `ReactionPopupMenu` | Single board: the Reactions menu is the soundboard now. Board state, emoji grid and dialog live in `src/swag/reactions/`; the menu only renders them. |
+| `src/button/ReactionToggleButton.module.css` | `.customReaction` + `.deleteOverlay` (red cross on hover/focus) | Edit-mode delete affordance for custom pads. |
+| `src/components/CallFooter.stories.tsx` | `roomId` in the mocked reactions context | Follows the new required context field. |

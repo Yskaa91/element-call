@@ -79,7 +79,11 @@ function parseSound(entry: unknown): SoundboardSound | null {
   // v1 boards predate the emoji field: map a missing emoji to "" so old pads
   // keep parsing (the menu hides them until edited). A present emoji must be
   // a short string; anything else is hostile and dropped.
-  if (emoji !== undefined && (typeof emoji !== "string" || emoji.length === 0 || emoji.length > 8)) return null;
+  if (
+    emoji !== undefined &&
+    (typeof emoji !== "string" || emoji.length === 0 || emoji.length > 8)
+  )
+    return null;
   if (typeof mxc !== "string") return null;
   if (typeof mimetype !== "string") return null;
   if (!isFiniteNumber(size) || size < 0) return null;
@@ -91,7 +95,17 @@ function parseSound(entry: unknown): SoundboardSound | null {
   if (durationMs > SOUNDBOARD_LIMITS.maxDurationMs) return null;
   if (typeof addedBy !== "string") return null;
   if (!isFiniteNumber(addedTs)) return null;
-  return { id, name, emoji: typeof emoji === "string" ? emoji : "", mxc, mimetype, size, durationMs, addedBy, addedTs };
+  return {
+    id,
+    name,
+    emoji: typeof emoji === "string" ? emoji : "",
+    mxc,
+    mimetype,
+    size,
+    durationMs,
+    addedBy,
+    addedTs,
+  };
 }
 
 /**
@@ -117,7 +131,9 @@ export function parseBoard(content: unknown): SoundboardSound[] {
 }
 
 /** Writes a board in the shape `parseBoard` reads back. */
-export function serializeBoard(sounds: SoundboardSound[]): SoundboardBoardContent {
+export function serializeBoard(
+  sounds: SoundboardSound[],
+): SoundboardBoardContent {
   return {
     version: 2,
     sounds: sounds.map((sound) => ({
@@ -144,7 +160,10 @@ export function serializeBoard(sounds: SoundboardSound[]): SoundboardBoardConten
  * Returns the board unchanged when it is already full and the pad is new, so
  * the caller can tell that the pad was rejected.
  */
-export function addSound(board: SoundboardSound[], sound: SoundboardSound): SoundboardSound[] {
+export function addSound(
+  board: SoundboardSound[],
+  sound: SoundboardSound,
+): SoundboardSound[] {
   const existing = board.findIndex((candidate) => candidate.id === sound.id);
   if (existing >= 0) {
     const next = [...board];
@@ -156,7 +175,10 @@ export function addSound(board: SoundboardSound[], sound: SoundboardSound): Soun
 }
 
 /** Removes a pad by id; unknown ids are ignored. */
-export function removeSound(board: SoundboardSound[], id: string): SoundboardSound[] {
+export function removeSound(
+  board: SoundboardSound[],
+  id: string,
+): SoundboardSound[] {
   return board.filter((sound) => sound.id !== id);
 }
 
@@ -165,8 +187,13 @@ export function removeSound(board: SoundboardSound[], id: string): SoundboardSou
  *
  * Returns a reason to show the user, or null when the file is acceptable.
  */
-export function validateSoundFile(file: { size: number; durationMs: number }): string | null {
-  if (file.size > SOUNDBOARD_LIMITS.maxBytes) return "Sound files must be 2 MB or smaller";
-  if (file.durationMs > SOUNDBOARD_LIMITS.maxDurationMs) return "Sound files must be 30 seconds or shorter";
+export function validateSoundFile(file: {
+  size: number;
+  durationMs: number;
+}): string | null {
+  if (file.size > SOUNDBOARD_LIMITS.maxBytes)
+    return "Sound files must be 2 MB or smaller";
+  if (file.durationMs > SOUNDBOARD_LIMITS.maxDurationMs)
+    return "Sound files must be 30 seconds or shorter";
   return null;
 }

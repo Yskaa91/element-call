@@ -101,6 +101,35 @@ div.reactionPopupMenuRoot.reactionPopupMenuModal > div > div {
   margin-right: var(--cpd-separator-spacing);
 }
 
+/* Custom board pads: the delete cross only appears on hover/focus. */
+.customReaction {
+  position: relative;
+}
+
+.deleteOverlay {
+  display: none;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  padding: 2px;
+  border-radius: var(--cpd-radius-pill-effect);
+  border: none;
+  cursor: pointer;
+  color: white;
+  background: var(--cpd-color-bg-critical-primary);
+}
+
+.deleteOverlay > svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.customReaction:hover .deleteOverlay,
+.customReaction:focus-within .deleteOverlay {
+  display: block;
+}
+
 .alert {
   margin-bottom: var(--cpd-space-3x);
   animation: grow-in 200ms;

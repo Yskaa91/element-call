@@ -34,7 +34,9 @@ function sound(overrides: Partial<SoundboardSound> = {}): SoundboardSound {
 }
 
 /** The on-the-wire shape: snake_case, as the spec's `sounds[]` entries. */
-function wireSound(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function wireSound(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     id: "one",
     name: "Air horn",
@@ -57,7 +59,11 @@ describe("SOUNDBOARD_EVENT_TYPE", () => {
 
 describe("SOUNDBOARD_LIMITS", () => {
   it("holds the agreed limits", () => {
-    expect(SOUNDBOARD_LIMITS).toEqual({ maxSounds: 32, maxBytes: 2 * 1024 * 1024, maxDurationMs: 30_000 });
+    expect(SOUNDBOARD_LIMITS).toEqual({
+      maxSounds: 32,
+      maxBytes: 2 * 1024 * 1024,
+      maxDurationMs: 30_000,
+    });
   });
 });
 
@@ -124,7 +130,10 @@ describe("parseBoard", () => {
       sounds: [
         wireSound({ id: "ok" }),
         wireSound({ id: "huge", size: SOUNDBOARD_LIMITS.maxBytes + 1 }),
-        wireSound({ id: "long", duration_ms: SOUNDBOARD_LIMITS.maxDurationMs + 1 }),
+        wireSound({
+          id: "long",
+          duration_ms: SOUNDBOARD_LIMITS.maxDurationMs + 1,
+        }),
       ],
     });
     expect(board.map((entry) => entry.id)).toEqual(["ok"]);
@@ -144,10 +153,13 @@ describe("parseBoard", () => {
   });
 
   it("caps the board at the pad limit", () => {
-    const sounds = Array.from({ length: SOUNDBOARD_LIMITS.maxSounds + 1 }, (_, i) =>
-      wireSound({ id: `pad-${i}` }),
+    const sounds = Array.from(
+      { length: SOUNDBOARD_LIMITS.maxSounds + 1 },
+      (_, i) => wireSound({ id: `pad-${i}` }),
     );
-    expect(parseBoard({ version: 1, sounds })).toHaveLength(SOUNDBOARD_LIMITS.maxSounds);
+    expect(parseBoard({ version: 1, sounds })).toHaveLength(
+      SOUNDBOARD_LIMITS.maxSounds,
+    );
   });
 
   it("round-trips the emoji through serialize and parse", () => {
@@ -175,7 +187,10 @@ describe("parseBoard", () => {
   });
 
   it("still parses version 1 content", () => {
-    const board = parseBoard({ version: 1, sounds: [wireSound({ emoji: "📯" })] });
+    const board = parseBoard({
+      version: 1,
+      sounds: [wireSound({ emoji: "📯" })],
+    });
     expect(board).toHaveLength(1);
     expect(board[0].emoji).toBe("📯");
   });
@@ -188,7 +203,10 @@ describe("serializeBoard", () => {
   });
 
   it("writes the agreed content shape", () => {
-    expect(serializeBoard([sound()])).toEqual({ version: 2, sounds: [wireSound()] });
+    expect(serializeBoard([sound()])).toEqual({
+      version: 2,
+      sounds: [wireSound()],
+    });
   });
 
   it("rounds a fractional duration to an integer: Matrix content must not contain floats", () => {
@@ -214,14 +232,18 @@ describe("addSound", () => {
   });
 
   it("rejects a 33rd pad", () => {
-    const full = Array.from({ length: SOUNDBOARD_LIMITS.maxSounds }, (_, i) => sound({ id: `pad-${i}` }));
+    const full = Array.from({ length: SOUNDBOARD_LIMITS.maxSounds }, (_, i) =>
+      sound({ id: `pad-${i}` }),
+    );
     const board = addSound(full, sound({ id: "one-too-many" }));
     expect(board).toHaveLength(SOUNDBOARD_LIMITS.maxSounds);
     expect(board.some((s) => s.id === "one-too-many")).toBe(false);
   });
 
   it("still replaces by id when the board is full", () => {
-    const full = Array.from({ length: SOUNDBOARD_LIMITS.maxSounds }, (_, i) => sound({ id: `pad-${i}` }));
+    const full = Array.from({ length: SOUNDBOARD_LIMITS.maxSounds }, (_, i) =>
+      sound({ id: `pad-${i}` }),
+    );
     const board = addSound(full, sound({ id: "pad-0", name: "Changed" }));
     expect(board).toHaveLength(SOUNDBOARD_LIMITS.maxSounds);
     expect(board.find((s) => s.id === "pad-0")?.name).toBe("Changed");
@@ -241,18 +263,29 @@ describe("removeSound", () => {
 
 describe("validateSoundFile", () => {
   it("rejects an over-size file", () => {
-    expect(validateSoundFile({ size: SOUNDBOARD_LIMITS.maxBytes + 1, durationMs: 1000 })).toMatch(/2 MB/);
+    expect(
+      validateSoundFile({
+        size: SOUNDBOARD_LIMITS.maxBytes + 1,
+        durationMs: 1000,
+      }),
+    ).toMatch(/2 MB/);
   });
 
   it("rejects an over-duration file", () => {
-    expect(validateSoundFile({ size: 1000, durationMs: SOUNDBOARD_LIMITS.maxDurationMs + 1 })).toMatch(
-      /30 seconds/,
-    );
+    expect(
+      validateSoundFile({
+        size: 1000,
+        durationMs: SOUNDBOARD_LIMITS.maxDurationMs + 1,
+      }),
+    ).toMatch(/30 seconds/);
   });
 
   it("accepts a file at the limits", () => {
     expect(
-      validateSoundFile({ size: SOUNDBOARD_LIMITS.maxBytes, durationMs: SOUNDBOARD_LIMITS.maxDurationMs }),
+      validateSoundFile({
+        size: SOUNDBOARD_LIMITS.maxBytes,
+        durationMs: SOUNDBOARD_LIMITS.maxDurationMs,
+      }),
     ).toBeNull();
   });
 });

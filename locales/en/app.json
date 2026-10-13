@@ -3,10 +3,15 @@
     "user_menu": "User menu"
   },
   "action": {
+    "add_sound": "Add sound",
     "blur_background": "Blur background",
     "close": "Close",
     "copy_link": "Copy link",
+    "delete": "Delete",
+    "delete_sound": "Delete {{name}}",
+    "delete_sound_confirm": "Delete {{name}} from the board for everyone?",
     "edit": "Edit",
+    "edit_sounds": "Edit sounds",
     "go": "Go",
     "invite": "Invite",
     "lower_hand": "Lower hand",
@@ -268,8 +273,8 @@
     "name_label": "Sound name",
     "name_placeholder": "Optional — defaults to the file name",
     "play_failed": "Could not play the sound",
-    "read_failed": "Could not read the soundboard",
     "reach_failed": "Could not reach the soundboard",
+    "read_failed": "Could not read the soundboard",
     "save_failed": "Could not save the soundboard",
     "title": "Soundboard",
     "volume": "Pad volume"

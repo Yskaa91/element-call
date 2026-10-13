@@ -182,13 +182,16 @@ export const SoundboardPanel: FC<SoundboardPanelProps> = ({
         // A transient "playing" marker, so a trigger does not look like a no-op.
         setPlayingIds((previous) => new Set(previous).add(sound.id));
         const duration = Number.isFinite(buffer.duration) ? buffer.duration : 0;
-        window.setTimeout(() => {
-          setPlayingIds((previous) => {
-            const next = new Set(previous);
-            next.delete(sound.id);
-            return next;
-          });
-        }, Math.max(300, duration * 1000));
+        window.setTimeout(
+          () => {
+            setPlayingIds((previous) => {
+              const next = new Set(previous);
+              next.delete(sound.id);
+              return next;
+            });
+          },
+          Math.max(300, duration * 1000),
+        );
       } catch (e) {
         setError(messageOf(e, t("soundboard.play_failed")));
       }

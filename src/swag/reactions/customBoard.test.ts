@@ -55,7 +55,12 @@ describe("mergeCustomReactions", () => {
       custom({ emoji: "📯", name: "Air horn" }),
       custom({ id: "pad-2", emoji: "🥁", name: "Drum" }),
     ]);
-    expect(merged.map((r) => r.name)).toEqual(["thumbsup", "party", "Air horn", "Drum"]);
+    expect(merged.map((r) => r.name)).toEqual([
+      "thumbsup",
+      "party",
+      "Air horn",
+      "Drum",
+    ]);
     expect(merged[2].emoji).toBe("📯");
   });
 

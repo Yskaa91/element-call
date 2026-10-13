@@ -63,6 +63,7 @@ function CallFooterStoryWrapper({
         <ReactionsSenderContext
           value={{
             supportsReactions: false,
+            roomId: "!room:example.org",
             toggleRaisedHand: async () => Promise.resolve(),
             sendReaction: async (reaction: ReactionOption) => Promise.resolve(),
           }}
