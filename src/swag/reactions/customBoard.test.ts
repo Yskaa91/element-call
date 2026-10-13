@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { type ReactionOption } from "../../reactions";
 import { CURATED_EMOJIS, isCuratedEmoji } from "./emojiList";
-import { mergeCustomReactions } from "./customBoard";
+import { mergeCustomReactions, uniquePadName } from "./customBoard";
 import { type SoundboardSound } from "../soundboard/board";
 
 function builtin(): ReactionOption[] {
@@ -67,5 +67,27 @@ describe("mergeCustomReactions", () => {
   it("hides v1 pads without an emoji", () => {
     const merged = mergeCustomReactions(builtin(), [custom({ emoji: "" })]);
     expect(merged).toEqual(builtin());
+  });
+
+  it("carries the pad id so duplicate names stay distinct", () => {
+    const merged = mergeCustomReactions(builtin(), [
+      custom({ id: "pad-1", name: "Horn" }),
+      custom({ id: "pad-2", name: "Horn", mxc: "mxc://example.org/horn2" }),
+    ]);
+    expect(merged.slice(2)).toEqual([
+      { emoji: "📯", name: "Horn", padId: "pad-1" },
+      { emoji: "📯", name: "Horn", padId: "pad-2" },
+    ]);
+  });
+});
+
+describe("uniquePadName", () => {
+  it("keeps a fresh name", () => {
+    expect(uniquePadName([{ name: "Horn" }], "Drum")).toBe("Drum");
+  });
+
+  it("suffixes taken names until free", () => {
+    const pads = [{ name: "Horn" }, { name: "Horn (2)" }];
+    expect(uniquePadName(pads, "Horn")).toBe("Horn (3)");
   });
 });

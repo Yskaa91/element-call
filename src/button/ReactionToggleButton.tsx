@@ -40,8 +40,16 @@ import { Modal } from "../Modal";
 import { useBehavior } from "../useBehavior";
 import { type Behavior } from "../state/Behavior";
 import { useCustomBoard } from "../swag/reactions/useCustomBoard";
-import { mergeCustomReactions } from "../swag/reactions/customBoard";
-import { AddSoundDialog, type NewPad } from "../swag/reactions/AddSoundDialog";
+import {
+  mergeCustomReactions,
+  type CustomReactionOption,
+} from "../swag/reactions/customBoard";
+import {
+  AddSoundDialog,
+  validateNewPad,
+  type NewPad,
+} from "../swag/reactions/AddSoundDialog";
+import { SOUNDBOARD_LIMITS } from "../swag/soundboard/board";
 
 interface InnerButtonProps extends ComponentPropsWithoutRef<"button"> {
   raised: boolean;
@@ -87,9 +95,8 @@ export function ReactionPopupMenu({
   const [editMode, setEditMode] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<ReactionOption | null>(
-    null,
-  );
+  const [pendingDelete, setPendingDelete] =
+    useState<CustomReactionOption | null>(null);
   const { pads, error, editable, add, remove } = useCustomBoard(roomId ?? "");
 
   const filteredReactionSet = useMemo(
@@ -97,30 +104,43 @@ export function ReactionPopupMenu({
     [isFullyExpanded],
   );
   const customReactions = useMemo(
-    () => mergeCustomReactions([], roomId ? pads : []).slice(0),
+    () =>
+      mergeCustomReactions([], roomId ? pads : []).filter(
+        (reaction): reaction is CustomReactionOption => "padId" in reaction,
+      ),
     [pads, roomId],
   );
   const label = isHandRaised ? t("action.lower_hand") : t("action.raise_hand");
 
   const submitAdd = useCallback(
     async (pad: NewPad): Promise<void> => {
+      // Emoji, name, size and full-board are checkable before anything is
+      // decoded or uploaded; duration is re-checked in the hook after decode.
+      // A refusal keeps the dialog open with the reason shown inside it.
+      const refusal = validateNewPad({
+        emoji: pad.emoji,
+        name: pad.name,
+        file: pad.file,
+        durationMs: 0,
+        full: pads.length >= SOUNDBOARD_LIMITS.maxSounds,
+      });
+      if (refusal !== null) {
+        setAddError(refusal);
+        return;
+      }
       setAddError(null);
       await add(pad);
       setAddOpen(false);
     },
-    [add],
+    [add, pads],
   );
 
   const confirmDelete = useCallback(async (): Promise<void> => {
     if (pendingDelete === null) return;
-    const pad = pads.find(
-      (candidate) =>
-        candidate.name === pendingDelete.name &&
-        candidate.emoji === pendingDelete.emoji,
-    );
+    const padId = pendingDelete.padId;
     setPendingDelete(null);
-    if (pad) await remove(pad.id);
-  }, [pendingDelete, pads, remove]);
+    await remove(padId);
+  }, [pendingDelete, remove]);
   return (
     <>
       {errorText && (
@@ -205,7 +225,7 @@ export function ReactionPopupMenu({
             ))}
             {customReactions.map((reaction) => (
               <li
-                key={`custom-${reaction.name}`}
+                key={`custom-${reaction.padId}`}
                 className={styles.customReaction}
               >
                 <Tooltip label={reaction.name}>

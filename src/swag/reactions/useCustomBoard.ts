@@ -20,6 +20,7 @@ import {
   type SoundboardClient,
 } from "../soundboard/boardClient";
 import { decodeAudio } from "../soundboard/decodeAudio";
+import { uniquePadName } from "./customBoard";
 import { useSoundboardWidget } from "../soundboard/SoundboardWidgetContext";
 import { type NewPad } from "./AddSoundDialog";
 
@@ -107,7 +108,7 @@ export function useCustomBoard(roomId: string): {
         const uploaded = await client.upload(pad.file);
         const sound: SoundboardSound = {
           id: newId(),
-          name: pad.name.slice(0, 100),
+          name: uniquePadName(pads, pad.name),
           emoji: pad.emoji,
           mxc: uploaded.mxc,
           mimetype: uploaded.mimetype,
