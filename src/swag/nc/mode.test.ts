@@ -70,20 +70,20 @@ describe("readNoiseCancellationMode", () => {
     expect(readNoiseCancellationMode()).toBe("gtcrn");
   });
 
-  it("falls back to browser for an unknown or drifted stored value", async () => {
+  it("falls back to the default for an unknown or drifted stored value", async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify("nope"));
     const { readNoiseCancellationMode } = await importMode();
-    expect(readNoiseCancellationMode()).toBe("browser");
+    expect(readNoiseCancellationMode()).toBe("gtcrn");
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify("gtcrn "));
     const { readNoiseCancellationMode: readDrifted } = await importMode();
-    expect(readDrifted()).toBe("browser");
+    expect(readDrifted()).toBe("gtcrn");
   });
 
-  it("falls back to browser for a hostile stored value", async () => {
+  it("falls back to the default for a hostile stored value", async () => {
     localStorage.setItem(STORAGE_KEY, "not json");
     const { readNoiseCancellationMode } = await importMode();
-    expect(readNoiseCancellationMode()).toBe("browser");
+    expect(readNoiseCancellationMode()).toBe("gtcrn");
   });
 });
 

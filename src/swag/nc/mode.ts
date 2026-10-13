@@ -13,7 +13,7 @@ export type NoiseCancellationMode = (typeof NOISE_CANCELLATION_MODES)[number];
 
 export const noiseCancellationSetting = new Setting<NoiseCancellationMode>(
   "noise-cancellation-mode",
-  "browser",
+  "gtcrn",
 );
 
 export function isNoiseCancellationMode(
@@ -27,11 +27,11 @@ export function isNoiseCancellationMode(
 
 /**
  * Raw localStorage values survive upgrades, so anything unknown, legacy or
- * hostile resolves to `browser` rather than throwing.
+ * hostile resolves to the default rather than throwing.
  */
 export function readNoiseCancellationMode(): NoiseCancellationMode {
   const value: unknown = noiseCancellationSetting.getValue();
-  return isNoiseCancellationMode(value) ? value : "browser";
+  return isNoiseCancellationMode(value) ? value : "gtcrn";
 }
 
 export interface MicProcessingToggles {
