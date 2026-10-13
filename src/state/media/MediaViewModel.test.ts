@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
 */
 
-import { expect, onTestFinished, test, vi } from "vitest";
+import { beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import {
   type LocalTrackPublication,
   LocalVideoTrack,
@@ -43,6 +43,10 @@ vi.mock("../../Platform", () => ({
 }));
 
 const rtcMembership = mockRtcMembership("@alice:example.org", "AAAA");
+
+// Receiver volumes persist in localStorage across view models: each test gets
+// a clean store so committed volumes never leak between tests.
+beforeEach(() => localStorage.clear());
 
 test("control a participant's volume", () => {
   const setVolumeSpy = vi.fn();

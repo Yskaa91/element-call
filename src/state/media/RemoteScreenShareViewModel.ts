@@ -20,7 +20,7 @@ import { createVolumeControls, type VolumeControls } from "../VolumeControls";
 import {
   readStoredVolume,
   writeStoredVolume,
-} from "../../../swag/volume/playbackVolumes";
+} from "../../swag/volume/playbackVolumes";
 import { observeTrackReference$ } from "../observeTrackReference";
 
 export interface RemoteScreenShareViewModel
