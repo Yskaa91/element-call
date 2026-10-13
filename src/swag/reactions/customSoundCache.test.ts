@@ -38,7 +38,7 @@ describe("resolveCustomSound", () => {
 
 describe("fetchCustomSounds", () => {
   it("downloads each pad once and keys buffers by name", async () => {
-    const download = vi.fn(async () => new Uint8Array([1, 2]).buffer as ArrayBuffer);
+    const download = vi.fn(() => Promise.resolve(new Uint8Array([1, 2]).buffer as ArrayBuffer));
     const pads = [pad(), pad({ id: "pad-2", name: "Drum", emoji: "🥁", mxc: "mxc://example.org/drum" })];
     const first = await fetchCustomSounds(download, pads);
     expect(Object.keys(first).sort()).toEqual(["Air horn", "Drum"]);
@@ -48,9 +48,9 @@ describe("fetchCustomSounds", () => {
   });
 
   it("skips pads without an emoji and survives a failed download", async () => {
-    const download = vi.fn(async (mxc: string) => {
-      if (mxc.includes("bad")) throw new Error("nope");
-      return new Uint8Array([1]).buffer as ArrayBuffer;
+    const download = vi.fn((mxc: string) => {
+      if (mxc.includes("bad")) return Promise.reject(new Error("nope"));
+      return Promise.resolve(new Uint8Array([1]).buffer as ArrayBuffer);
     });
     const buffers = await fetchCustomSounds(download, [
       pad({ emoji: "" }),
