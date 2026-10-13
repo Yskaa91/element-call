@@ -76,3 +76,6 @@ do not be surprised that noise-cancellation code touches a "soundboard" file.
 | `src/button/ReactionToggleButton.tsx` | edit toggle, custom pads, plus button, add + confirm-delete dialogs in `ReactionPopupMenu` | Single board: the Reactions menu is the soundboard now. Board state, emoji grid and dialog live in `src/swag/reactions/`; the menu only renders them. |
 | `src/button/ReactionToggleButton.module.css` | `.customReaction` + `.deleteOverlay` (red cross on hover/focus) | Edit-mode delete affordance for custom pads. |
 | `src/components/CallFooter.stories.tsx` | `roomId` in the mocked reactions context | Follows the new required context field. |
+
+| `src/room/ReactionAudioRenderer.tsx` | custom pad buffers merged into the audio engine + `roomId` prop | Receipt-side playback: custom reactions resolve by name to MXC buffers (`src/swag/reactions/customSoundCache.ts`), unknown names fall back to generic. |
+| `src/room/InCallView.tsx` | `roomId={matrixRoom.roomId}` on `<ReactionsAudioRenderer>` | The renderer needs the call room to find its space board. |

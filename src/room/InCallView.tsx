@@ -694,7 +694,7 @@ export const InCallView: FC<InCallViewProps> = ({
       ))}
       {renderContent()}
       <CallEventAudioRenderer vm={vm} muted={muteAllAudio} />
-      <ReactionsAudioRenderer vm={vm} muted={muteAllAudio} />
+      <ReactionsAudioRenderer vm={vm} muted={muteAllAudio} roomId={matrixRoom.roomId} />
       <RingingAudioRenderer vm={ringingVm} muted={muteAllAudio} />
       {reconnectingToast}
       {screenShareToast}
