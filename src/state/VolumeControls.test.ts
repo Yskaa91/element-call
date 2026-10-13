@@ -6,7 +6,6 @@ Please see LICENSE in the repository root for full details.
 */
 
 import { describe, expect, test, beforeEach } from "vitest";
-import { of } from "rxjs";
 
 import { createVolumeControls } from "./VolumeControls";
 import { ObservableScope } from "./ObservableScope";
