@@ -101,9 +101,17 @@ div.reactionPopupMenuRoot.reactionPopupMenuModal > div > div {
   margin-right: var(--cpd-separator-spacing);
 }
 
+/* Left column: hand button on top, edit pencil under it. */
+.leftControls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* Custom board pads: the delete cross only appears on hover/focus. */
 .customReaction {
   position: relative;
+  isolation: isolate;
 }
 
 .deleteOverlay {
@@ -111,6 +119,7 @@ div.reactionPopupMenuRoot.reactionPopupMenuModal > div > div {
   position: absolute;
   top: -6px;
   right: -6px;
+  z-index: 1;
   padding: 2px;
   border-radius: var(--cpd-radius-pill-effect);
   border: none;

@@ -90,4 +90,13 @@ describe("uniquePadName", () => {
     const pads = [{ name: "Horn" }, { name: "Horn (2)" }];
     expect(uniquePadName(pads, "Horn")).toBe("Horn (3)");
   });
+
+  it("never exceeds the 100-character stored-name cap, suffix included", () => {
+    const long = "a".repeat(100);
+    const taken = new Set([long]);
+    const result = uniquePadName([{ name: long }], long);
+    expect(result.length).toBeLessThanOrEqual(100);
+    expect(result).not.toBe(long);
+    expect(taken.has(result)).toBe(false);
+  });
 });

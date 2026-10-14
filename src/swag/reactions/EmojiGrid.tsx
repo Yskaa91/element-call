@@ -6,8 +6,10 @@ Please see LICENSE in the repository root for full details.
 */
 
 import { type FC } from "react";
+import { useTranslation } from "react-i18next";
 
 import { CURATED_EMOJIS } from "./emojiList";
+import styles from "./EmojiGrid.module.css";
 
 /**
  * The 100 offered emojis as a 5-wide scrollable grid (20 rows max).
@@ -18,40 +20,28 @@ import { CURATED_EMOJIS } from "./emojiList";
 export const EmojiGrid: FC<{
   value: string;
   onPick: (emoji: string) => void;
-}> = ({ value, onPick }) => (
-  <div
-    role="listbox"
-    aria-label="Emoji"
-    style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(5, 1fr)",
-      gap: 4,
-      maxHeight: 240,
-      overflowY: "auto",
-    }}
-  >
-    {CURATED_EMOJIS.map((emoji) => (
-      <button
-        key={emoji}
-        type="button"
-        role="option"
-        aria-selected={value === emoji}
-        onClick={() => onPick(emoji)}
-        data-testid={`emoji-pick-${emoji}`}
-        style={{
-          fontSize: 24,
-          padding: 6,
-          borderRadius: 8,
-          border: "none",
-          cursor: "pointer",
-          background:
-            value === emoji
-              ? "var(--cpd-color-bg-action-primary-rest)"
-              : "transparent",
-        }}
-      >
-        {emoji}
-      </button>
-    ))}
-  </div>
-);
+}> = ({ value, onPick }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="listbox"
+      aria-label={t("action.emoji", "Emoji")}
+      className={styles.grid}
+    >
+      {CURATED_EMOJIS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          role="option"
+          aria-selected={value === emoji}
+          data-selected={value === emoji}
+          onClick={() => onPick(emoji)}
+          data-testid={`emoji-pick-${emoji}`}
+          className={styles.pick}
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  );
+};

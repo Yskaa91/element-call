@@ -1,0 +1,28 @@
+/*
+Copyright 2026 Element Creations Ltd.
+
+SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE in the repository root for full details.
+*/
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--cpd-space-1x);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.pick {
+  font-size: 24px;
+  padding: var(--cpd-space-1x);
+  border-radius: var(--cpd-radius-pill-effect);
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--cpd-color-text-primary);
+}
+
+.pick[data-selected="true"] {
+  background: var(--cpd-color-bg-action-primary-rest);
+}

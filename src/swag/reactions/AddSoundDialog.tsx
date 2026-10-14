@@ -5,12 +5,17 @@ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
 */
 
-import { type ChangeEvent, type FC, useState } from "react";
+import { type ChangeEvent, type FC, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Button as CpdButton } from "@vector-im/compound-web";
+import { AttachmentIcon } from "@vector-im/compound-design-tokens/assets/web/icons";
 
 import { Modal } from "../../Modal";
+import { FieldRow, InputField } from "../../input/Input";
 import { isCuratedEmoji } from "./emojiList";
 import { validateSoundFile } from "../soundboard/board";
 import { EmojiGrid } from "./EmojiGrid";
+import styles from "./AddSoundDialog.module.css";
 
 export interface NewPad {
   emoji: string;
@@ -53,9 +58,11 @@ export const AddSoundDialog: FC<{
   onClose: () => void;
   onSubmit: (pad: NewPad) => void;
 }> = ({ open, error, onClose, onSubmit }) => {
+  const { t } = useTranslation();
   const [emoji, setEmoji] = useState("");
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const onFileChange = (event: ChangeEvent<HTMLInputElement>): void => {
     const picked = event.target.files?.[0] ?? null;
@@ -66,43 +73,70 @@ export const AddSoundDialog: FC<{
   const canSubmit = emoji !== "" && name.trim() !== "" && file !== null;
 
   return (
-    <Modal open={open} title="Add sound" onDismiss={onClose}>
-      <EmojiGrid value={emoji} onPick={setEmoji} />
-      <label>
-        <span>Name</span>
-        <input
-          type="text"
-          value={name}
-          maxLength={100}
-          placeholder="Horn"
-          onChange={(event) => setName(event.target.value)}
-          data-testid="add-sound-name"
-        />
-      </label>
-      <label>
-        <input
-          type="file"
-          accept="audio/*"
-          onChange={onFileChange}
-          data-testid="add-sound-file"
-        />
-        <span>{file?.name ?? "Choose audio file"}</span>
-      </label>
-      {error !== null && (
-        <p role="alert" data-testid="add-sound-error">
-          {error}
-        </p>
-      )}
-      <button
-        type="button"
-        disabled={!canSubmit}
-        onClick={() => {
-          if (file) onSubmit({ emoji, name: name.trim(), file });
-        }}
-        data-testid="add-sound-submit"
-      >
-        Add
-      </button>
+    <Modal open={open} title={t("action.add_sound")} onDismiss={onClose}>
+      <div className={styles.form}>
+        <EmojiGrid value={emoji} onPick={setEmoji} />
+        <FieldRow>
+          <InputField
+            type="text"
+            id="add-sound-name"
+            label={t("action.sound_name", "Sound name")}
+            value={name}
+            placeholder="Horn"
+            onChange={(event) => setName(event.target.value)}
+            data-testid="add-sound-name"
+          />
+        </FieldRow>
+        <div className={styles.fileRow}>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="audio/*"
+            aria-label={t("action.sound_file", "Sound file")}
+            onChange={onFileChange}
+            data-testid="add-sound-file"
+            className={styles.fileInput}
+          />
+          <CpdButton
+            kind="secondary"
+            Icon={AttachmentIcon}
+            onClick={() => fileInput.current?.click()}
+          >
+            {t("action.choose_audio_file", "Choose audio file")}
+          </CpdButton>
+          <span className={styles.fileName}>
+            {file?.name ?? t("action.choose_audio_file", "Choose audio file")}
+          </span>
+        </div>
+        {error !== null && (
+          <p
+            role="alert"
+            data-testid="add-sound-error"
+            className={styles.error}
+          >
+            {error}
+          </p>
+        )}
+        <div className={styles.actions}>
+          <CpdButton
+            kind="tertiary"
+            onClick={onClose}
+            data-testid="add-sound-cancel"
+          >
+            {t("action.cancel", "Cancel")}
+          </CpdButton>
+          <CpdButton
+            kind="primary"
+            disabled={!canSubmit}
+            onClick={() => {
+              if (file) onSubmit({ emoji, name: name.trim(), file });
+            }}
+            data-testid="add-sound-submit"
+          >
+            {t("action.add", "Add")}
+          </CpdButton>
+        </div>
+      </div>
     </Modal>
   );
 };

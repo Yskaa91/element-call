@@ -17,13 +17,19 @@ export interface CustomReactionOption extends ReactionOption {
  * Suffixes a pad name until it is unique on the board.
  *
  * Names key menu rows, delete matching and receipt playback, so two pads
- * must never share one. Truncates the stem to the stored-name cap first.
+ * must never share one. The result never exceeds the 100-character
+ * stored-name cap, suffix included.
  */
 export function uniquePadName(pads: { name: string }[], name: string): string {
   const taken = new Set(pads.map((existing) => existing.name));
-  const stem = name.slice(0, 100);
-  let candidate = stem;
-  for (let n = 2; taken.has(candidate); n++) candidate = `${stem} (${n})`;
+  const cap = 100;
+  let n = 1;
+  let candidate = name.slice(0, cap);
+  while (taken.has(candidate)) {
+    n += 1;
+    const suffix = ` (${n})`;
+    candidate = `${name.slice(0, cap - suffix.length)}${suffix}`;
+  }
   return candidate;
 }
 

@@ -1,0 +1,46 @@
+/*
+Copyright 2026 Element Creations Ltd.
+
+SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+Please see LICENSE in the repository root for full details.
+*/
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cpd-space-4x);
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: var(--cpd-space-2x);
+}
+
+.fileName {
+  font-size: var(--font-size-body-sm);
+  color: var(--cpd-color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.error {
+  font-size: var(--font-size-body-sm);
+  color: var(--cpd-color-text-critical-primary);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--cpd-space-2x);
+}

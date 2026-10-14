@@ -162,21 +162,9 @@ export function ReactionPopupMenu({
         </Alert>
       )}
       <div className={styles.reactionPopupMenu}>
-        {editable && (
-          <section className={styles.handRaiseSection}>
-            <Tooltip label={t("action.edit_sounds")}>
-              <CpdButton
-                kind={editMode ? "primary" : "secondary"}
-                aria-pressed={editMode}
-                aria-label={t("action.edit_sounds")}
-                onClick={() => setEditMode((value) => !value)}
-                iconOnly
-                Icon={EditIcon}
-              />
-            </Tooltip>
-          </section>
-        )}
-        <section className={styles.handRaiseSection}>
+        <section
+          className={classNames(styles.handRaiseSection, styles.leftControls)}
+        >
           <Tooltip label={label} caption="H">
             <CpdButton
               kind={isHandRaised ? "primary" : "secondary"}
@@ -188,6 +176,18 @@ export function ReactionPopupMenu({
               Icon={RaisedHandSolidIcon}
             />
           </Tooltip>
+          {editable && (
+            <Tooltip label={t("action.edit_sounds")}>
+              <CpdButton
+                kind={editMode ? "primary" : "secondary"}
+                aria-pressed={editMode}
+                aria-label={t("action.edit_sounds")}
+                onClick={() => setEditMode((value) => !value)}
+                iconOnly
+                Icon={EditIcon}
+              />
+            </Tooltip>
+          )}
         </section>
         <div className={styles.verticalSeperator} />
         <section className={styles.reactionsMenuSection}>
@@ -232,8 +232,13 @@ export function ReactionPopupMenu({
                   <CpdButton
                     kind="secondary"
                     className={styles.reactionButton}
-                    disabled={!canReact}
-                    onClick={() => sendReaction(reaction)}
+                    disabled={editMode ? false : !canReact}
+                    onClick={() =>
+                      editMode
+                        ? setPendingDelete(reaction)
+                        : sendReaction(reaction)
+                    }
+                    data-testid={`custom-pad-${reaction.padId}`}
                   >
                     {reaction.emoji}
                   </CpdButton>
@@ -246,7 +251,7 @@ export function ReactionPopupMenu({
                       name: reaction.name,
                     })}
                     onClick={() => setPendingDelete(reaction)}
-                    data-testid={`delete-custom-${reaction.name}`}
+                    data-testid={`delete-custom-${reaction.padId}`}
                   >
                     <CloseIcon aria-hidden />
                   </button>

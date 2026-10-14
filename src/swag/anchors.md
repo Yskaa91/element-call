@@ -73,8 +73,9 @@ do not be surprised that noise-cancellation code touches a "soundboard" file.
 | Upstream file | Anchor | Why |
 | ------------- | ------ | --- |
 | `src/reactions/useReactionsSender.tsx` | `roomId` in `ReactionsSenderContextType` + value | The custom board lives in the call room's space; the menu needs the room id and the provider already owns the session. |
-| `src/button/ReactionToggleButton.tsx` | edit toggle, custom pads, plus button, add + confirm-delete dialogs in `ReactionPopupMenu` | Single board: the Reactions menu is the soundboard now. Board state, emoji grid and dialog live in `src/swag/reactions/`; the menu only renders them. |
-| `src/button/ReactionToggleButton.module.css` | `.customReaction` + `.deleteOverlay` (red cross on hover/focus) | Edit-mode delete affordance for custom pads. |
+| `src/button/ReactionToggleButton.tsx` | edit toggle, custom pads, plus button, add + confirm-delete dialogs in `ReactionPopupMenu` | Single board: the Reactions menu is the soundboard now. Board state, emoji grid and dialog live in `src/swag/reactions/`; the menu only renders them. Hand + pencil share one left column (hand first, pencil under it); in edit mode a custom pad click opens confirm-delete by `padId` instead of sending, and stays enabled when `canReact` is false. |
+| `src/button/ReactionToggleButton.module.css` | `.leftControls` (hand + pencil stacked, 10px gap), `.customReaction` + `.deleteOverlay` (red cross on hover/focus) | Edit-mode delete affordance for custom pads; pencil-under-hand layout. |
+| `src/swag/reactions/AddSoundDialog.tsx` + `EmojiGrid.tsx` (+ their `.module.css`) | compound `Button`, `FieldRow`/`InputField`, compound CSS tokens, i18n keys under `action` | Add dialog matches project style: no inline styles, hidden file input + secondary picker button, right-aligned Cancel (tertiary) / Add (primary) actions. |
 | `src/components/CallFooter.stories.tsx` | `roomId` in the mocked reactions context | Follows the new required context field. |
 
 | `src/room/ReactionAudioRenderer.tsx` | custom pad buffers merged into the audio engine + `roomId` prop | Receipt-side playback: custom reactions resolve by name to MXC buffers (`src/swag/reactions/customSoundCache.ts`), unknown names fall back to generic. |

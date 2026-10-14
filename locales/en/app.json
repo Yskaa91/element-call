@@ -3,8 +3,11 @@
     "user_menu": "User menu"
   },
   "action": {
+    "add": "Add",
     "add_sound": "Add sound",
     "blur_background": "Blur background",
+    "cancel": "Cancel",
+    "choose_audio_file": "Choose audio file",
     "close": "Close",
     "copy_link": "Copy link",
     "delete": "Delete",
@@ -12,6 +15,7 @@
     "delete_sound_confirm": "Delete {{name}} from the board for everyone?",
     "edit": "Edit",
     "edit_sounds": "Edit sounds",
+    "emoji": "Emoji",
     "go": "Go",
     "invite": "Invite",
     "lower_hand": "Lower hand",
@@ -24,6 +28,8 @@
     "show_more": "Show more",
     "sign_in": "Sign in",
     "sign_out": "Sign out",
+    "sound_file": "Sound file",
+    "sound_name": "Sound name",
     "submit": "Submit",
     "upload_file": "Upload file"
   },
