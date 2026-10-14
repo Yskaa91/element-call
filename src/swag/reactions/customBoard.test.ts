@@ -99,4 +99,10 @@ describe("uniquePadName", () => {
     expect(result).not.toBe(long);
     expect(taken.has(result)).toBe(false);
   });
+
+  it("treats built-in reaction names as taken for new pads", () => {
+    // The menu passes [...ReactionSet, ...board.sounds]: a custom pad sharing
+    // a built-in name would be unplayable by name.
+    expect(uniquePadName(builtin(), "party")).toBe("party (2)");
+  });
 });

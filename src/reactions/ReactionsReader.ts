@@ -289,11 +289,16 @@ export class ReactionsReader {
       }
 
       // One of our custom reactions
+      const builtin = ReactionSet.find((r) => r.name === content.name);
       const reaction = {
         ...GenericReaction,
+        ...builtin,
         emoji,
-        // If we don't find a reaction, we can fallback to the generic sound.
-        ...ReactionSet.find((r) => r.name === content.name),
+        // A custom pad name is not in ReactionSet: spreading undefined would
+        // leave GenericReaction.name behind, so the receipt plays the generic
+        // sound for a sound it actually downloaded. Keep the sent name and
+        // fall back to the generic sound only for audio.
+        name: builtin?.name ?? content.name ?? GenericReaction.name,
       };
 
       const currentReactions = this.reactionsSubject$.value;

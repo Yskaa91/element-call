@@ -108,8 +108,8 @@ div.reactionPopupMenuRoot.reactionPopupMenuModal > div > div {
   gap: 10px;
 }
 
-/* Custom board pads: the delete cross only appears on hover/focus. */
-.customReaction {
+/* Editable reactions (built-ins and custom pads): the delete cross only appears on hover/focus. */
+.editableReaction {
   position: relative;
   isolation: isolate;
 }
@@ -134,8 +134,8 @@ div.reactionPopupMenuRoot.reactionPopupMenuModal > div > div {
   height: 14px;
 }
 
-.customReaction:hover .deleteOverlay,
-.customReaction:focus-within .deleteOverlay {
+.editableReaction:hover .deleteOverlay,
+.editableReaction:focus-within .deleteOverlay {
   display: block;
 }
 

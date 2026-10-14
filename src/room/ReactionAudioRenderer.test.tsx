@@ -60,10 +60,12 @@ vitest.mock("../soundUtils");
 vitest.mock("../swag/reactions/useCustomBoard", () => ({
   useCustomBoard: vitest.fn(() => ({
     pads: [],
+    hiddenBuiltins: [],
     error: null,
     editable: false,
     add: vitest.fn(),
     remove: vitest.fn(),
+    hideBuiltin: vitest.fn(),
   })),
 }));
 vitest.mock("../swag/reactions/customSoundCache", () => ({
@@ -196,6 +198,69 @@ describe("ReactionAudioRenderer", () => {
     expect(playSound).toHaveBeenCalledWith(reaction2.name);
   });
 
+  it("plays the uploaded file for a custom reaction name, not the generic sound", () => {
+    const pad = {
+      id: "pad1",
+      name: "Horn",
+      emoji: "📯",
+      mxc: "mxc://example/horn",
+      mimetype: "audio/ogg",
+      size: 1000,
+      durationMs: 1000,
+      addedBy: "@alice:example.org",
+      addedTs: 0,
+    };
+    (useCustomBoard as MockedFunction<typeof useCustomBoard>).mockReturnValue({
+      pads: [pad],
+      hiddenBuiltins: [],
+      error: null,
+      editable: true,
+      add: vitest.fn(),
+      remove: vitest.fn(),
+      hideBuiltin: vitest.fn(),
+    });
+    (
+      resolveCustomSound as MockedFunction<typeof resolveCustomSound>
+    ).mockReturnValue(pad);
+    const { vm, reactionsSubject$ } = getBasicCallViewModelEnvironment([
+      local,
+      alice,
+    ]);
+    playReactionsSoundSetting.setValue(true);
+    render(
+      <HostBridgeProvider
+        value={{
+          ...nullHostBridge,
+          downloadMedia: vitest.fn(async () => {
+            await Promise.resolve();
+            return new Blob([]);
+          }),
+        }}
+      >
+        <TooltipProvider>
+          <ReactionsAudioRenderer vm={vm} roomId="!room:example.org" />
+        </TooltipProvider>
+      </HostBridgeProvider>,
+    );
+
+    act(() => {
+      reactionsSubject$.next({
+        [aliceRtcMember.deviceId]: {
+          // As ReactionsReader builds it for an unknown name: the sent name
+          // kept, generic sound only as the audio fallback.
+          reactionOption: {
+            emoji: "📯",
+            name: "Horn",
+            sound: GenericReaction.sound,
+          },
+          expireAfter: new Date(0),
+        },
+      });
+    });
+    expect(playSound).toHaveBeenCalledWith("Horn");
+    expect(playSound).not.toHaveBeenCalledWith(GenericReaction.name);
+  });
+
   it("fetches custom pad sounds once without looping the audio engine", async () => {
     (useAudioContext as MockedFunction<typeof useAudioContext>).mockClear();
     (fetchCustomSounds as MockedFunction<typeof fetchCustomSounds>).mockClear();
@@ -212,10 +277,12 @@ describe("ReactionAudioRenderer", () => {
     };
     (useCustomBoard as MockedFunction<typeof useCustomBoard>).mockReturnValue({
       pads: [pad],
+      hiddenBuiltins: [],
       error: null,
       editable: true,
       add: vitest.fn(),
       remove: vitest.fn(),
+      hideBuiltin: vitest.fn(),
     });
     (
       fetchCustomSounds as MockedFunction<typeof fetchCustomSounds>

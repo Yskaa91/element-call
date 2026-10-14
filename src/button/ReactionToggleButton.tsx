@@ -8,8 +8,6 @@ Please see LICENSE in the repository root for full details.
 import { Button as CpdButton, Tooltip, Alert } from "@vector-im/compound-web";
 import {
   RaisedHandSolidIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
   ReactionSolidIcon,
   EditIcon,
   PlusIcon,
@@ -91,18 +89,20 @@ export function ReactionPopupMenu({
   roomId?: string;
 }): ReactNode {
   const { t } = useTranslation();
-  const [isFullyExpanded, setExpanded] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] =
-    useState<CustomReactionOption | null>(null);
-  const { pads, error, editable, add, remove } = useCustomBoard(roomId ?? "");
+  const [pendingDelete, setPendingDelete] = useState<
+    ReactionOption | CustomReactionOption | null
+  >(null);
+  const { pads, hiddenBuiltins, error, editable, add, remove, hideBuiltin } =
+    useCustomBoard(roomId ?? "");
 
-  const showAll = isFullyExpanded || editMode;
-  const filteredReactionSet = useMemo(
-    () => (showAll ? ReactionSet : ReactionSet.slice(0, ReactionsRowSize)),
-    [showAll],
+  // The full grid, always: visible built-ins, then custom pads, then the add
+  // button last. Deleting a built-in hides it space-wide via the board state.
+  const visibleBuiltinReactions = useMemo(
+    () => ReactionSet.filter((r) => !hiddenBuiltins.includes(r.name)),
+    [hiddenBuiltins],
   );
   const customReactions = useMemo(
     () =>
@@ -138,10 +138,14 @@ export function ReactionPopupMenu({
 
   const confirmDelete = useCallback(async (): Promise<void> => {
     if (pendingDelete === null) return;
-    const padId = pendingDelete.padId;
+    const doomed = pendingDelete;
     setPendingDelete(null);
-    await remove(padId);
-  }, [pendingDelete, remove]);
+    if ("padId" in doomed) {
+      await remove(doomed.padId);
+    } else {
+      await hideBuiltin(doomed.name);
+    }
+  }, [pendingDelete, remove, hideBuiltin]);
   return (
     <>
       {errorText && (
@@ -192,14 +196,12 @@ export function ReactionPopupMenu({
         </section>
         <div className={styles.verticalSeperator} />
         <section className={styles.reactionsMenuSection}>
-          <menu
-            className={classNames(
-              isFullyExpanded && styles.reactionsMenuExpanded,
-              styles.reactionsMenu,
-            )}
-          >
-            {filteredReactionSet.map((reaction, index) => (
-              <li key={reaction.name}>
+          <menu className={styles.reactionsMenu}>
+            {visibleBuiltinReactions.map((reaction, index) => (
+              <li
+                key={reaction.name}
+                className={classNames(editMode && styles.editableReaction)}
+              >
                 <Tooltip
                   label={reaction.name}
                   caption={
@@ -211,56 +213,73 @@ export function ReactionPopupMenu({
                   <CpdButton
                     kind="secondary"
                     className={styles.reactionButton}
-                    disabled={!canReact}
-                    onClick={() => sendReaction(reaction)}
+                    disabled={editMode ? false : !canReact}
+                    onClick={() =>
+                      editMode
+                        ? setPendingDelete(reaction)
+                        : sendReaction(reaction)
+                    }
                     aria-keyshortcuts={
                       index < ReactionsRowSize
                         ? (index + 1).toString()
                         : undefined
                     }
+                    data-testid={`builtin-${reaction.name}`}
                   >
                     {reaction.emoji}
                   </CpdButton>
                 </Tooltip>
+                {editMode && (
+                  <button
+                    type="button"
+                    className={styles.deleteOverlay}
+                    aria-label={t("action.delete_sound", {
+                      name: reaction.name,
+                    })}
+                    onClick={() => setPendingDelete(reaction)}
+                    data-testid={`delete-builtin-${reaction.name}`}
+                  >
+                    <CloseIcon aria-hidden />
+                  </button>
+                )}
               </li>
             ))}
-            {showAll &&
-              customReactions.map((reaction) => (
-                <li
-                  key={`custom-${reaction.padId}`}
-                  className={styles.customReaction}
-                >
-                  <Tooltip label={reaction.name}>
-                    <CpdButton
-                      kind="secondary"
-                      className={styles.reactionButton}
-                      disabled={editMode ? false : !canReact}
-                      onClick={() =>
-                        editMode
-                          ? setPendingDelete(reaction)
-                          : sendReaction(reaction)
-                      }
-                      data-testid={`custom-pad-${reaction.padId}`}
-                    >
-                      {reaction.emoji}
-                    </CpdButton>
-                  </Tooltip>
-                  {editMode && (
-                    <button
-                      type="button"
-                      className={styles.deleteOverlay}
-                      aria-label={t("action.delete_sound", {
-                        name: reaction.name,
-                      })}
-                      onClick={() => setPendingDelete(reaction)}
-                      data-testid={`delete-custom-${reaction.padId}`}
-                    >
-                      <CloseIcon aria-hidden />
-                    </button>
-                  )}
-                </li>
-              ))}
-            {showAll && editable && (
+            {customReactions.map((reaction) => (
+              <li
+                key={`custom-${reaction.padId}`}
+                className={classNames(editMode && styles.editableReaction)}
+              >
+                <Tooltip label={reaction.name}>
+                  <CpdButton
+                    kind="secondary"
+                    className={styles.reactionButton}
+                    disabled={editMode ? false : !canReact}
+                    onClick={() =>
+                      editMode
+                        ? setPendingDelete(reaction)
+                        : sendReaction(reaction)
+                    }
+                    data-testid={`custom-pad-${reaction.padId}`}
+                  >
+                    {reaction.emoji}
+                  </CpdButton>
+                </Tooltip>
+                {editMode && (
+                  <button
+                    type="button"
+                    className={styles.deleteOverlay}
+                    aria-label={t("action.delete_sound", {
+                      name: reaction.name,
+                    })}
+                    onClick={() => setPendingDelete(reaction)}
+                    data-testid={`delete-custom-${reaction.padId}`}
+                  >
+                    <CloseIcon aria-hidden />
+                  </button>
+                )}
+              </li>
+            ))}
+            {editable && (
               <li>
                 <Tooltip label={t("action.add_sound")}>
                   <CpdButton
@@ -278,23 +297,6 @@ export function ReactionPopupMenu({
               </li>
             )}
           </menu>
-        </section>
-        <section style={{ marginLeft: "var(--cpd-separator-spacing)" }}>
-          <Tooltip
-            label={
-              isFullyExpanded ? t("action.show_less") : t("action.show_more")
-            }
-          >
-            <CpdButton
-              iconOnly
-              aria-label={
-                isFullyExpanded ? t("action.show_less") : t("action.show_more")
-              }
-              Icon={isFullyExpanded ? ChevronUpIcon : ChevronDownIcon}
-              kind="tertiary"
-              onClick={() => setExpanded(!isFullyExpanded)}
-            />
-          </Tooltip>
         </section>
       </div>
       <AddSoundDialog

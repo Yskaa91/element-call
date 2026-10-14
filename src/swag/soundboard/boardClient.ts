@@ -18,7 +18,7 @@ import {
   SOUNDBOARD_EVENT_TYPE,
   parseBoard,
   serializeBoard,
-  type SoundboardSound,
+  type SoundboardBoard,
 } from "./board";
 
 /** An upload's result, in the board's terms. */
@@ -94,10 +94,15 @@ export class SoundboardClient {
   ) {}
 
   /** Reads the board from the space room. Rejects with {@link SoundboardError}. */
-  public async load(): Promise<SoundboardSound[]> {
+  public async load(): Promise<SoundboardBoard> {
     let events: IRoomEvent[];
     try {
-      events = await this.api.readStateEvents(SOUNDBOARD_EVENT_TYPE, undefined, undefined, [this.spaceRoomId]);
+      events = await this.api.readStateEvents(
+        SOUNDBOARD_EVENT_TYPE,
+        undefined,
+        undefined,
+        [this.spaceRoomId],
+      );
     } catch (cause) {
       throw new SoundboardError("Could not read the soundboard", cause);
     }
@@ -116,9 +121,14 @@ export class SoundboardClient {
   }
 
   /** Writes the board to the space room. Rejects with {@link SoundboardError}. */
-  public async save(sounds: SoundboardSound[]): Promise<void> {
+  public async save(board: SoundboardBoard): Promise<void> {
     try {
-      await this.api.sendStateEvent(SOUNDBOARD_EVENT_TYPE, "", serializeBoard(sounds), this.spaceRoomId);
+      await this.api.sendStateEvent(
+        SOUNDBOARD_EVENT_TYPE,
+        "",
+        serializeBoard(board),
+        this.spaceRoomId,
+      );
     } catch (cause) {
       throw new SoundboardError("Could not save the soundboard", cause);
     }
@@ -137,7 +147,8 @@ export class SoundboardClient {
       const data = ev.detail.data as IUpdateStateToWidgetRequestData;
       ev.preventDefault();
       this.api.transport.reply(ev.detail, {});
-      if (data.state?.some((event) => event.type === SOUNDBOARD_EVENT_TYPE)) callback();
+      if (data.state?.some((event) => event.type === SOUNDBOARD_EVENT_TYPE))
+        callback();
     };
     this.api.on(UPDATE_STATE_ACTION, handler);
     return () => this.api.off(UPDATE_STATE_ACTION, handler);
@@ -152,18 +163,29 @@ export class SoundboardClient {
  * (`content.canonical === true`) wins, falling back to the first parent when
  * none is marked canonical. Returns null when the room is in no space.
  */
-export async function resolveSpaceRoomId(api: WidgetApi, roomId: string): Promise<string | null> {
+export async function resolveSpaceRoomId(
+  api: WidgetApi,
+  roomId: string,
+): Promise<string | null> {
   let events: IRoomEvent[];
   try {
-    events = await api.readStateEvents(EventType.SpaceParent, undefined, undefined, [roomId]);
+    events = await api.readStateEvents(
+      EventType.SpaceParent,
+      undefined,
+      undefined,
+      [roomId],
+    );
   } catch (cause) {
     throw new SoundboardError("Could not read the room's space parent", cause);
   }
   const parents = events.filter(
-    (event) => typeof event.state_key === "string" && event.state_key.length > 0,
+    (event) =>
+      typeof event.state_key === "string" && event.state_key.length > 0,
   );
   const canonical = parents.find(
-    (event) => (event.content as { canonical?: unknown } | undefined)?.canonical === true,
+    (event) =>
+      (event.content as { canonical?: unknown } | undefined)?.canonical ===
+      true,
   );
   return (canonical ?? parents[0])?.state_key ?? null;
 }
@@ -177,7 +199,10 @@ export async function resolveSpaceRoomId(api: WidgetApi, roomId: string): Promis
  * resolves once the host has actually granted them (its `notify_capabilities`
  * action), so a `load()` issued straight afterwards is not refused.
  */
-export async function createSoundboardClient(api: WidgetApi, roomId: string): Promise<SoundboardClient | null> {
+export async function createSoundboardClient(
+  api: WidgetApi,
+  roomId: string,
+): Promise<SoundboardClient | null> {
   const spaceRoomId = await resolveSpaceRoomId(api, roomId);
   if (spaceRoomId === null) return null;
 
@@ -190,7 +215,10 @@ export async function createSoundboardClient(api: WidgetApi, roomId: string): Pr
   try {
     await api.updateRequestedCapabilities();
   } catch (cause) {
-    throw new SoundboardError("Could not request the soundboard capabilities", cause);
+    throw new SoundboardError(
+      "Could not request the soundboard capabilities",
+      cause,
+    );
   }
   await capabilitiesGranted;
 

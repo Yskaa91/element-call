@@ -11,14 +11,13 @@ import { TooltipProvider } from "@vector-im/compound-web";
 import { userEvent } from "@testing-library/user-event";
 
 import { ReactionPopupMenu } from "./ReactionToggleButton";
+import { ReactionSet } from "../reactions";
 
-const { mockAdd, mockRemove } = vi.hoisted(() => ({
+const { mockAdd, mockRemove, mockHideBuiltin, mockBoard } = vi.hoisted(() => ({
   mockAdd: vi.fn(),
   mockRemove: vi.fn(),
-}));
-
-vi.mock("../swag/reactions/useCustomBoard", () => ({
-  useCustomBoard: vi.fn(() => ({
+  mockHideBuiltin: vi.fn(),
+  mockBoard: {
     pads: [
       {
         id: "pad1",
@@ -32,10 +31,19 @@ vi.mock("../swag/reactions/useCustomBoard", () => ({
         addedTs: 0,
       },
     ],
+    hiddenBuiltins: [] as string[],
+  },
+}));
+
+vi.mock("../swag/reactions/useCustomBoard", () => ({
+  useCustomBoard: vi.fn(() => ({
+    pads: mockBoard.pads,
+    hiddenBuiltins: mockBoard.hiddenBuiltins,
     error: null,
     editable: true,
     add: mockAdd,
     remove: mockRemove,
+    hideBuiltin: mockHideBuiltin,
   })),
 }));
 
@@ -60,6 +68,7 @@ function renderMenu(props?: {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockBoard.hiddenBuiltins = [];
 });
 
 test("pencil sits under the hand button in DOM order", () => {
@@ -76,35 +85,53 @@ test("pencil sits under the hand button in DOM order", () => {
 test("no delete overlay before edit mode", () => {
   const { queryByTestId } = renderMenu();
   expect(queryByTestId("delete-custom-pad1")).toBeNull();
+  expect(queryByTestId("delete-builtin-thumbsup")).toBeNull();
 });
 
-test("collapsed menu hides custom pads and the add button", () => {
-  const { queryByTestId, queryByLabelText } = renderMenu();
-  expect(queryByTestId("custom-pad-pad1")).toBeNull();
-  expect(queryByLabelText("Add sound")).toBeNull();
-});
-
-test("expanded menu shows built-ins first, then custom pads, then add last", async () => {
-  const user = userEvent.setup();
+test("the full grid is always present: built-ins, then custom pads, then add last", () => {
   const { getByLabelText, getByTestId, container } = renderMenu();
-  await user.click(getByLabelText("Show more"));
   const pad = getByTestId("custom-pad-pad1");
   expect(pad).toBeDefined();
   const addButton = getByLabelText("Add sound");
   const items = [...container.querySelectorAll("menu li")];
+  const firstBuiltin = items.findIndex(
+    (li) => li.querySelector("[data-testid^='builtin-']") !== null,
+  );
   const padIndex = items.findIndex((li) => li.contains(pad));
   const addIndex = items.findIndex((li) => li.contains(addButton));
-  expect(padIndex).toBeGreaterThanOrEqual(0);
+  expect(firstBuiltin).toBe(0);
+  expect(padIndex).toBeGreaterThan(firstBuiltin);
   expect(addIndex).toBe(items.length - 1);
   expect(padIndex).toBeLessThan(addIndex);
+  // Every built-in renders: no show-more gate.
+  expect(items.length).toBe(ReactionSet.length + 1 + 1);
 });
 
-test("entering edit mode forces the expanded view", async () => {
+test("hidden built-ins are not rendered", () => {
+  mockBoard.hiddenBuiltins = ["thumbsup"];
+  const { queryByTestId, getByTestId } = renderMenu();
+  expect(queryByTestId("builtin-thumbsup")).toBeNull();
+  expect(getByTestId("builtin-party")).toBeDefined();
+});
+
+test("edit mode shows delete overlays for built-ins and custom pads", async () => {
   const user = userEvent.setup();
-  const { getByLabelText, getByTestId } = renderMenu();
+  const { getByLabelText, queryByTestId } = renderMenu();
   await user.click(getByLabelText("Edit sounds"));
-  expect(getByTestId("custom-pad-pad1")).toBeDefined();
-  expect(getByLabelText("Add sound")).toBeDefined();
+  expect(queryByTestId("delete-custom-pad1")).not.toBeNull();
+  expect(queryByTestId("delete-builtin-thumbsup")).not.toBeNull();
+});
+
+test("built-in delete confirm hides the built-in and never sends", async () => {
+  const user = userEvent.setup();
+  const { getByLabelText, getByTestId, getByText, sendReaction } = renderMenu();
+  await user.click(getByLabelText("Edit sounds"));
+  await user.click(getByTestId("builtin-thumbsup"));
+  expect(sendReaction).not.toHaveBeenCalled();
+  expect(getByText(/Delete thumbsup from the board/)).toBeDefined();
+  await user.click(getByText("Delete", { selector: "button" }));
+  expect(mockHideBuiltin).toHaveBeenCalledWith("thumbsup");
+  expect(mockRemove).not.toHaveBeenCalled();
 });
 
 test("edit mode shows delete overlay; clicking pad opens confirm and does not send", async () => {
@@ -123,15 +150,23 @@ test("edit mode shows delete overlay; clicking pad opens confirm and does not se
   expect(getByText(/Delete Horn from the board/)).toBeDefined();
   await user.click(getByText("Delete", { selector: "button" }));
   expect(mockRemove).toHaveBeenCalledWith("pad1");
+  expect(mockHideBuiltin).not.toHaveBeenCalled();
 });
 
 test("clicking custom pad outside edit mode sends the reaction", async () => {
   const user = userEvent.setup();
-  const { getByLabelText, getByTestId, sendReaction } = renderMenu();
-  await user.click(getByLabelText("Show more"));
+  const { getByTestId, sendReaction } = renderMenu();
   await user.click(getByTestId("custom-pad-pad1"));
   expect(sendReaction).toHaveBeenCalledTimes(1);
   expect(sendReaction.mock.calls[0][0]).toMatchObject({ padId: "pad1" });
+});
+
+test("clicking a built-in outside edit mode sends the reaction", async () => {
+  const user = userEvent.setup();
+  const { getByTestId, sendReaction } = renderMenu();
+  await user.click(getByTestId("builtin-party"));
+  expect(sendReaction).toHaveBeenCalledTimes(1);
+  expect(sendReaction.mock.calls[0][0]).toMatchObject({ name: "party" });
 });
 
 test("edit-mode pad stays enabled when reactions are exhausted", async () => {

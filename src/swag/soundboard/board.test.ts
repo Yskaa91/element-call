@@ -8,13 +8,16 @@ Please see LICENSE in the repository root for full details.
 import { describe, expect, it } from "vitest";
 
 import {
+  HIDDEN_BUILTINS_LIMIT,
   SOUNDBOARD_EVENT_TYPE,
   SOUNDBOARD_LIMITS,
   addSound,
+  hideBuiltin,
   parseBoard,
   removeSound,
   serializeBoard,
   validateSoundFile,
+  type SoundboardBoard,
   type SoundboardSound,
 } from "./board";
 
@@ -33,6 +36,10 @@ function sound(overrides: Partial<SoundboardSound> = {}): SoundboardSound {
   };
 }
 
+function board(overrides: Partial<SoundboardBoard> = {}): SoundboardBoard {
+  return { sounds: [sound()], hiddenBuiltins: [], ...overrides };
+}
+
 /** The on-the-wire shape: snake_case, as the spec's `sounds[]` entries. */
 function wireSound(
   overrides: Record<string, unknown> = {},
@@ -47,6 +54,17 @@ function wireSound(
     duration_ms: 1500,
     added_by: "@alice:example.org",
     added_ts: 1_700_000_000_000,
+    ...overrides,
+  };
+}
+
+function wireBoard(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    version: 3,
+    sounds: [wireSound()],
+    hidden_builtins: [],
     ...overrides,
   };
 }
@@ -69,31 +87,32 @@ describe("SOUNDBOARD_LIMITS", () => {
 
 describe("parseBoard", () => {
   it("parses a valid board and maps the wire names", () => {
-    const board = parseBoard({ version: 1, sounds: [wireSound()] });
-    expect(board).toEqual([sound()]);
+    expect(parseBoard({ version: 3, sounds: [wireSound()] })).toEqual(board());
   });
 
   it("ignores unknown extra fields", () => {
-    const board = parseBoard({
-      version: 1,
-      future: { anything: true },
-      sounds: [wireSound({ colour: "red" })],
-    });
-    expect(board).toEqual([sound()]);
+    expect(
+      parseBoard({
+        version: 3,
+        future: { anything: true },
+        sounds: [wireSound({ colour: "red" })],
+      }),
+    ).toEqual(board());
   });
 
   it("drops entries with the wrong field types", () => {
-    const board = parseBoard({
-      version: 1,
-      sounds: [
-        wireSound({ size: "1234" }),
-        wireSound({ duration_ms: null }),
-        wireSound({ added_ts: Number.NaN }),
-        wireSound({ id: 7 }),
-        wireSound({ name: 42 }),
-      ],
-    });
-    expect(board).toEqual([]);
+    expect(
+      parseBoard({
+        version: 3,
+        sounds: [
+          wireSound({ size: "1234" }),
+          wireSound({ duration_ms: null }),
+          wireSound({ added_ts: Number.NaN }),
+          wireSound({ id: 7 }),
+          wireSound({ name: 42 }),
+        ],
+      }),
+    ).toEqual(board({ sounds: [] }));
   });
 
   it("drops entries with missing fields", () => {
@@ -101,34 +120,37 @@ describe("parseBoard", () => {
     delete withoutName.name;
     const withoutMxc = wireSound();
     delete withoutMxc.mxc;
-    const board = parseBoard({ version: 1, sounds: [withoutName, withoutMxc] });
-    expect(board).toEqual([]);
+    expect(
+      parseBoard({ version: 3, sounds: [withoutName, withoutMxc] }),
+    ).toEqual(board({ sounds: [] }));
   });
 
   it("returns an empty board when sounds is not an array", () => {
-    expect(parseBoard({ version: 1, sounds: "nope" })).toEqual([]);
-    expect(parseBoard({ version: 1, sounds: {} })).toEqual([]);
-    expect(parseBoard({ version: 1 })).toEqual([]);
+    const empty = board({ sounds: [] });
+    expect(parseBoard({ version: 3, sounds: "nope" })).toEqual(empty);
+    expect(parseBoard({ version: 3, sounds: {} })).toEqual(empty);
+    expect(parseBoard({ version: 3 })).toEqual(empty);
   });
 
   it("never throws on hostile content", () => {
-    expect(parseBoard(null)).toEqual([]);
-    expect(parseBoard(undefined)).toEqual([]);
-    expect(parseBoard("board")).toEqual([]);
-    expect(parseBoard(42)).toEqual([]);
-    expect(parseBoard([])).toEqual([]);
+    const empty = board({ sounds: [] });
+    expect(parseBoard(null)).toEqual(empty);
+    expect(parseBoard(undefined)).toEqual(empty);
+    expect(parseBoard("board")).toEqual(empty);
+    expect(parseBoard(42)).toEqual(empty);
+    expect(parseBoard([])).toEqual(empty);
   });
 
   it("keeps a hostile oversized name (the UI truncates it later)", () => {
     const name = "a".repeat(1024 * 1024);
-    const board = parseBoard({ version: 1, sounds: [wireSound({ name })] });
-    expect(board).toHaveLength(1);
-    expect(board[0].name).toHaveLength(name.length);
+    const parsed = parseBoard({ version: 3, sounds: [wireSound({ name })] });
+    expect(parsed.sounds).toHaveLength(1);
+    expect(parsed.sounds[0].name).toHaveLength(name.length);
   });
 
   it("drops entries over the byte or duration limit and keeps the rest", () => {
-    const board = parseBoard({
-      version: 1,
+    const parsed = parseBoard({
+      version: 3,
       sounds: [
         wireSound({ id: "ok" }),
         wireSound({ id: "huge", size: SOUNDBOARD_LIMITS.maxBytes + 1 }),
@@ -138,12 +160,12 @@ describe("parseBoard", () => {
         }),
       ],
     });
-    expect(board.map((entry) => entry.id)).toEqual(["ok"]);
+    expect(parsed.sounds.map((entry) => entry.id)).toEqual(["ok"]);
   });
 
   it("keeps entries exactly at the limits", () => {
-    const board = parseBoard({
-      version: 1,
+    const parsed = parseBoard({
+      version: 3,
       sounds: [
         wireSound({
           size: SOUNDBOARD_LIMITS.maxBytes,
@@ -151,7 +173,7 @@ describe("parseBoard", () => {
         }),
       ],
     });
-    expect(board).toHaveLength(1);
+    expect(parsed.sounds).toHaveLength(1);
   });
 
   it("caps the board at the pad limit", () => {
@@ -159,26 +181,26 @@ describe("parseBoard", () => {
       { length: SOUNDBOARD_LIMITS.maxSounds + 1 },
       (_, i) => wireSound({ id: `pad-${i}` }),
     );
-    expect(parseBoard({ version: 1, sounds })).toHaveLength(
+    expect(parseBoard({ version: 3, sounds }).sounds).toHaveLength(
       SOUNDBOARD_LIMITS.maxSounds,
     );
   });
 
   it("round-trips the emoji through serialize and parse", () => {
-    const board = [sound({ emoji: "🥁" })];
-    expect(parseBoard(serializeBoard(board))).toEqual(board);
+    const expected = board({ sounds: [sound({ emoji: "🥁" })] });
+    expect(parseBoard(serializeBoard(expected))).toEqual(expected);
   });
 
   it("maps a missing emoji (v1 board) to an empty string", () => {
     const withoutEmoji = wireSound();
     delete withoutEmoji.emoji;
-    const board = parseBoard({ version: 1, sounds: [withoutEmoji] });
-    expect(board).toHaveLength(1);
-    expect(board[0].emoji).toBe("");
+    const parsed = parseBoard({ version: 1, sounds: [withoutEmoji] });
+    expect(parsed.sounds).toHaveLength(1);
+    expect(parsed.sounds[0].emoji).toBe("");
   });
 
   it("drops entries with a non-string or over-long emoji", () => {
-    const board = parseBoard({
+    const parsed = parseBoard({
       version: 2,
       sounds: [
         wireSound({ id: "bad-type", emoji: 42 }),
@@ -186,77 +208,150 @@ describe("parseBoard", () => {
         wireSound({ id: "ok", emoji: "👍" }),
       ],
     });
-    expect(board.map((entry) => entry.id)).toEqual(["ok"]);
+    expect(parsed.sounds.map((entry) => entry.id)).toEqual(["ok"]);
   });
 
   it("still parses version 1 content", () => {
-    const board = parseBoard({
+    const parsed = parseBoard({
       version: 1,
       sounds: [wireSound({ emoji: "📯" })],
     });
-    expect(board).toHaveLength(1);
-    expect(board[0].emoji).toBe("📯");
+    expect(parsed.sounds).toHaveLength(1);
+    expect(parsed.sounds[0].emoji).toBe("📯");
+  });
+
+  it("parses hidden built-ins", () => {
+    expect(
+      parseBoard(wireBoard({ hidden_builtins: ["thumbsup", "party"] })),
+    ).toEqual(board({ hiddenBuiltins: ["thumbsup", "party"] }));
+  });
+
+  it("defaults hidden built-ins to empty when missing", () => {
+    const content = wireBoard();
+    delete content.hidden_builtins;
+    expect(parseBoard(content)).toEqual(board());
+  });
+
+  it("drops hostile hidden built-ins without throwing", () => {
+    const empty = board({ sounds: [] });
+    expect(
+      parseBoard({ version: 3, sounds: [], hidden_builtins: "nope" }),
+    ).toEqual(empty);
+    expect(parseBoard({ version: 3, sounds: [], hidden_builtins: 42 })).toEqual(
+      empty,
+    );
+    expect(
+      parseBoard({
+        version: 3,
+        sounds: [],
+        hidden_builtins: ["ok", "", 42, null, "a".repeat(65), "ok"],
+      }),
+    ).toEqual({ sounds: [], hiddenBuiltins: ["ok"] });
+  });
+
+  it("dedupes and caps hidden built-ins", () => {
+    const hidden = Array.from(
+      { length: HIDDEN_BUILTINS_LIMIT + 10 },
+      (_, i) => `reaction-${i}`,
+    );
+    const parsed = parseBoard({
+      version: 3,
+      sounds: [],
+      hidden_builtins: [...hidden, "reaction-0"],
+    });
+    expect(parsed.hiddenBuiltins).toHaveLength(HIDDEN_BUILTINS_LIMIT);
+    expect(new Set(parsed.hiddenBuiltins).size).toBe(HIDDEN_BUILTINS_LIMIT);
   });
 });
 
 describe("serializeBoard", () => {
   it("round-trips through parseBoard", () => {
-    const board = [sound(), sound({ id: "two", name: "Buzzer" })];
-    expect(parseBoard(serializeBoard(board))).toEqual(board);
+    const expected = board({
+      sounds: [sound(), sound({ id: "two", name: "Buzzer" })],
+      hiddenBuiltins: ["thumbsup"],
+    });
+    expect(parseBoard(serializeBoard(expected))).toEqual(expected);
   });
 
   it("writes the agreed content shape", () => {
-    expect(serializeBoard([sound()])).toEqual({
-      version: 2,
-      sounds: [wireSound()],
-    });
+    expect(serializeBoard(board())).toEqual(wireBoard());
   });
 
   it("rounds a fractional duration to an integer: Matrix content must not contain floats", () => {
     // Decoded audio durations are fractional seconds, so durationMs is
     // fractional too — and Synapse answers M_BAD_JSON to a float in event
     // content. The wire value must be an integer for any input.
-    const serialized = serializeBoard([sound({ durationMs: 1234.56789 })]);
+    const serialized = serializeBoard(
+      board({ sounds: [sound({ durationMs: 1234.56789 })] }),
+    );
     expect(serialized.sounds[0].duration_ms).toBe(1235);
     expect(Number.isInteger(serialized.sounds[0].duration_ms)).toBe(true);
   });
 });
 
+describe("hideBuiltin", () => {
+  it("hides a built-in name", () => {
+    expect(hideBuiltin(board(), "thumbsup")).toEqual(
+      board({ hiddenBuiltins: ["thumbsup"] }),
+    );
+  });
+
+  it("is idempotent", () => {
+    const hidden = hideBuiltin(board(), "thumbsup");
+    expect(hideBuiltin(hidden, "thumbsup")).toEqual(hidden);
+  });
+
+  it("ignores misshapen names", () => {
+    expect(hideBuiltin(board(), "")).toEqual(board());
+    expect(hideBuiltin(board(), "a".repeat(65))).toEqual(board());
+  });
+
+  it("stops at the cap", () => {
+    const full = board({
+      hiddenBuiltins: Array.from(
+        { length: HIDDEN_BUILTINS_LIMIT },
+        (_, i) => `reaction-${i}`,
+      ),
+    });
+    expect(hideBuiltin(full, "one-more")).toEqual(full);
+  });
+});
+
 describe("addSound", () => {
   it("appends a new sound", () => {
-    const board = addSound([], sound());
-    expect(board).toEqual([sound()]);
+    expect(addSound([], sound())).toEqual([sound()]);
   });
 
   it("replaces a sound with the same id", () => {
-    const board = addSound([sound()], sound({ name: "Louder air horn" }));
-    expect(board).toHaveLength(1);
-    expect(board[0].name).toBe("Louder air horn");
+    const updated = addSound([sound()], sound({ name: "Louder air horn" }));
+    expect(updated).toHaveLength(1);
+    expect(updated[0].name).toBe("Louder air horn");
   });
 
   it("rejects a 33rd pad", () => {
     const full = Array.from({ length: SOUNDBOARD_LIMITS.maxSounds }, (_, i) =>
       sound({ id: `pad-${i}` }),
     );
-    const board = addSound(full, sound({ id: "one-too-many" }));
-    expect(board).toHaveLength(SOUNDBOARD_LIMITS.maxSounds);
-    expect(board.some((s) => s.id === "one-too-many")).toBe(false);
+    const updated = addSound(full, sound({ id: "one-too-many" }));
+    expect(updated).toHaveLength(SOUNDBOARD_LIMITS.maxSounds);
+    expect(updated.some((s) => s.id === "one-too-many")).toBe(false);
   });
 
   it("still replaces by id when the board is full", () => {
     const full = Array.from({ length: SOUNDBOARD_LIMITS.maxSounds }, (_, i) =>
       sound({ id: `pad-${i}` }),
     );
-    const board = addSound(full, sound({ id: "pad-0", name: "Changed" }));
-    expect(board).toHaveLength(SOUNDBOARD_LIMITS.maxSounds);
-    expect(board.find((s) => s.id === "pad-0")?.name).toBe("Changed");
+    const updated = addSound(full, sound({ id: "pad-0", name: "Changed" }));
+    expect(updated).toHaveLength(SOUNDBOARD_LIMITS.maxSounds);
+    expect(updated.find((s) => s.id === "pad-0")?.name).toBe("Changed");
   });
 });
 
 describe("removeSound", () => {
   it("removes by id and leaves the rest", () => {
-    const board = removeSound([sound(), sound({ id: "two" })], "one");
-    expect(board).toEqual([sound({ id: "two" })]);
+    expect(removeSound([sound(), sound({ id: "two" })], "one")).toEqual([
+      sound({ id: "two" }),
+    ]);
   });
 
   it("is a no-op for an unknown id", () => {

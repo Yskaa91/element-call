@@ -137,7 +137,10 @@ describe("SoundboardClient.load", () => {
     api.readStateEvents.mockResolvedValue([boardEvent()]);
 
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
-    await expect(client.load()).resolves.toEqual([SOUND]);
+    await expect(client.load()).resolves.toEqual({
+      sounds: [SOUND],
+      hiddenBuiltins: [],
+    });
     expect(api.readStateEvents).toHaveBeenCalledWith(
       SOUNDBOARD_EVENT_TYPE,
       undefined,
@@ -151,7 +154,26 @@ describe("SoundboardClient.load", () => {
     api.readStateEvents.mockResolvedValue([]);
 
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
-    await expect(client.load()).resolves.toEqual([]);
+    await expect(client.load()).resolves.toEqual({
+      sounds: [],
+      hiddenBuiltins: [],
+    });
+  });
+
+  it("reads hidden built-ins from the board event", async () => {
+    const api = mockApi();
+    const event = boardEvent();
+    event.content = {
+      ...event.content,
+      hidden_builtins: ["thumbsup"],
+    };
+    api.readStateEvents.mockResolvedValue([event]);
+
+    const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
+    await expect(client.load()).resolves.toEqual({
+      sounds: [SOUND],
+      hiddenBuiltins: ["thumbsup"],
+    });
   });
 
   it("surfaces a refused read as a typed error, not an empty board", async () => {
@@ -205,13 +227,14 @@ describe("SoundboardClient.save", () => {
     });
 
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
-    await client.save([SOUND]);
+    await client.save({ sounds: [SOUND], hiddenBuiltins: ["thumbsup"] });
 
     expect(api.sendStateEvent).toHaveBeenCalledWith(
       SOUNDBOARD_EVENT_TYPE,
       "",
       {
-        version: 2,
+        version: 3,
+        hidden_builtins: ["thumbsup"],
         sounds: [
           {
             id: SOUND.id,
@@ -235,7 +258,9 @@ describe("SoundboardClient.save", () => {
     api.sendStateEvent.mockRejectedValue(new Error("nope"));
 
     const client = new SoundboardClient(api, ROOM_ID, SPACE_ID);
-    await expect(client.save([])).rejects.toBeInstanceOf(SoundboardError);
+    await expect(
+      client.save({ sounds: [], hiddenBuiltins: [] }),
+    ).rejects.toBeInstanceOf(SoundboardError);
   });
 });
 
@@ -384,6 +409,9 @@ describe("createSoundboardClient", () => {
 
     // A load issued straight after creation must not be refused.
     api.readStateEvents.mockResolvedValue([boardEvent()]);
-    await expect(client!.load()).resolves.toEqual([SOUND]);
+    await expect(client!.load()).resolves.toEqual({
+      sounds: [SOUND],
+      hiddenBuiltins: [],
+    });
   });
 });

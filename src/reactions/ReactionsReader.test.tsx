@@ -24,7 +24,7 @@ import {
 } from "../utils/test-fixtures";
 import { getBasicRTCSession } from "../utils/test-viewmodel";
 import { testScope, withTestScheduler } from "../utils/test";
-import { ElementCallReactionEventType, ReactionSet } from ".";
+import { ElementCallReactionEventType, GenericReaction, ReactionSet } from ".";
 
 afterEach(() => {
   vitest.useRealTimers();
@@ -516,6 +516,61 @@ test("that reactions cannot be spammed", () => {
           d: {},
         },
       );
+    });
+  });
+});
+
+test("preserves a custom reaction name and falls back to the generic sound", () => {
+  const { rtcSession } = getBasicRTCSession([local, alice]);
+  const reactionEventId = "$my_event_id:example.org";
+
+  vitest.useFakeTimers();
+  vitest.setSystemTime(0);
+
+  withTestScheduler(({ schedule, expectObservable }) => {
+    renderHook(() => {
+      const { reactions$ } = new ReactionsReader(
+        testScope(),
+        rtcSession.asMockedSession(),
+      );
+      schedule(`ab`, {
+        a: () => {},
+        b: () => {
+          rtcSession.room.emit(
+            MatrixRoomEvent.Timeline,
+            new MatrixEvent({
+              room_id: rtcSession.room.roomId,
+              event_id: reactionEventId,
+              sender: localRtcMember.userId,
+              type: ElementCallReactionEventType,
+              content: {
+                emoji: "📯",
+                name: "Horn",
+                "m.relates_to": {
+                  event_id: localRtcMember.eventId,
+                },
+              },
+            }),
+            rtcSession.room,
+            undefined,
+            false,
+            {} as IRoomTimelineData,
+          );
+        },
+      });
+      expectObservable(reactions$).toBe(`ab`, {
+        a: {},
+        b: {
+          [`${localRtcMember.userId}:${localRtcMember.deviceId}`]: {
+            reactionOption: {
+              emoji: "📯",
+              name: "Horn",
+              sound: GenericReaction.sound,
+            },
+            expireAfter: new Date(REACTION_ACTIVE_TIME_MS),
+          },
+        },
+      });
     });
   });
 });

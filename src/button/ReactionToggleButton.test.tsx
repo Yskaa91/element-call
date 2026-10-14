@@ -146,14 +146,14 @@ test("Can react with emoji", async () => {
   );
 });
 
-test("Can fully expand emoji picker", async () => {
+test("The emoji picker always shows the full grid", async () => {
   const user = userEvent.setup();
   const { vm, rtcSession } = getBasicCallViewModelEnvironment([local, alice]);
-  const { getByLabelText, container, getByText } = render(
+  const { getByLabelText, queryByLabelText, container, getByText } = render(
     <TestComponent vm={vm} rtcSession={rtcSession} />,
   );
   await user.click(getByLabelText("Reactions"));
-  await user.click(getByLabelText("Show more"));
+  expect(queryByLabelText("Add sound")).toBeNull();
   expect(container).toMatchSnapshot();
   await user.click(getByText("🦗"));
   expect(rtcSession.room.client.sendEvent).toHaveBeenCalledWith(
@@ -168,16 +168,4 @@ test("Can fully expand emoji picker", async () => {
       emoji: "🦗",
     },
   );
-});
-
-test("Can close reaction dialog", async () => {
-  const user = userEvent.setup();
-  const { vm, rtcSession } = getBasicCallViewModelEnvironment([local, alice]);
-  const { getByLabelText, container } = render(
-    <TestComponent vm={vm} rtcSession={rtcSession} />,
-  );
-  await user.click(getByLabelText("Reactions"));
-  await user.click(getByLabelText("Show more"));
-  await user.click(getByLabelText("Show less"));
-  expect(container).toMatchSnapshot();
 });

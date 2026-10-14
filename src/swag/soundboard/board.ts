@@ -53,9 +53,20 @@ interface WireSound {
 
 /** The on-the-wire board content. */
 export interface SoundboardBoardContent {
-  version: 2;
+  version: 3;
   sounds: WireSound[];
+  hidden_builtins: string[];
 }
+
+/** The parsed board: custom pads plus hidden built-in reaction names. */
+export interface SoundboardBoard {
+  sounds: SoundboardSound[];
+  hiddenBuiltins: string[];
+}
+
+/** How many built-ins a hostile board may hide, and how long such a name may be. */
+export const HIDDEN_BUILTINS_LIMIT = 64;
+const HIDDEN_BUILTIN_NAME_MAX = 64;
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -109,6 +120,29 @@ function parseSound(entry: unknown): SoundboardSound | null {
 }
 
 /**
+ * Reads the hidden built-in list from an unknown wire value.
+ *
+ * Never throws: anything that is not an array of short non-empty strings is
+ * dropped, duplicates are removed, and the list is capped.
+ */
+function parseHiddenBuiltins(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const hidden: string[] = [];
+  for (const entry of value) {
+    if (
+      typeof entry !== "string" ||
+      entry.length === 0 ||
+      entry.length > HIDDEN_BUILTIN_NAME_MAX
+    )
+      continue;
+    if (hidden.includes(entry)) continue;
+    hidden.push(entry);
+    if (hidden.length >= HIDDEN_BUILTINS_LIMIT) break;
+  }
+  return hidden;
+}
+
+/**
  * Reads a board from an unknown state event content.
  *
  * Never throws: anything that is not a board, any entry that does not have
@@ -116,10 +150,15 @@ function parseSound(entry: unknown): SoundboardSound | null {
  * limit is dropped. Names are deliberately not length-checked here — a hostile
  * name must not take the board down, and the UI truncates what it renders.
  */
-export function parseBoard(content: unknown): SoundboardSound[] {
-  if (typeof content !== "object" || content === null) return [];
-  const sounds = (content as { sounds?: unknown }).sounds;
-  if (!Array.isArray(sounds)) return [];
+export function parseBoard(content: unknown): SoundboardBoard {
+  if (typeof content !== "object" || content === null)
+    return { sounds: [], hiddenBuiltins: [] };
+  const { sounds, hidden_builtins: hiddenBuiltins } = content as {
+    sounds?: unknown;
+    hidden_builtins?: unknown;
+  };
+  if (!Array.isArray(sounds))
+    return { sounds: [], hiddenBuiltins: parseHiddenBuiltins(hiddenBuiltins) };
 
   const parsed: SoundboardSound[] = [];
   for (const entry of sounds) {
@@ -127,16 +166,17 @@ export function parseBoard(content: unknown): SoundboardSound[] {
     if (sound !== null) parsed.push(sound);
     if (parsed.length >= SOUNDBOARD_LIMITS.maxSounds) break;
   }
-  return parsed;
+  return {
+    sounds: parsed,
+    hiddenBuiltins: parseHiddenBuiltins(hiddenBuiltins),
+  };
 }
 
 /** Writes a board in the shape `parseBoard` reads back. */
-export function serializeBoard(
-  sounds: SoundboardSound[],
-): SoundboardBoardContent {
+export function serializeBoard(board: SoundboardBoard): SoundboardBoardContent {
   return {
-    version: 2,
-    sounds: sounds.map((sound) => ({
+    version: 3,
+    sounds: board.sounds.map((sound) => ({
       id: sound.id,
       name: sound.name,
       emoji: sound.emoji,
@@ -151,6 +191,7 @@ export function serializeBoard(
       added_by: sound.addedBy,
       added_ts: sound.addedTs,
     })),
+    hidden_builtins: [...board.hiddenBuiltins],
   };
 }
 
@@ -180,6 +221,28 @@ export function removeSound(
   id: string,
 ): SoundboardSound[] {
   return board.filter((sound) => sound.id !== id);
+}
+
+/**
+ * Hides a built-in reaction from the board.
+ *
+ * Pure and idempotent: hiding twice, or hiding when the cap is reached, is a
+ * no-op. Only known-shaped names are hidden; the menu intersects the result
+ * with `ReactionSet`, so a hostile board cannot hide anything but built-ins.
+ */
+export function hideBuiltin(
+  board: SoundboardBoard,
+  name: string,
+): SoundboardBoard {
+  if (
+    typeof name !== "string" ||
+    name.length === 0 ||
+    name.length > HIDDEN_BUILTIN_NAME_MAX
+  )
+    return board;
+  if (board.hiddenBuiltins.includes(name)) return board;
+  if (board.hiddenBuiltins.length >= HIDDEN_BUILTINS_LIMIT) return board;
+  return { ...board, hiddenBuiltins: [...board.hiddenBuiltins, name] };
 }
 
 /**
