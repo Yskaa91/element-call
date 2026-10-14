@@ -99,9 +99,10 @@ export function ReactionPopupMenu({
     useState<CustomReactionOption | null>(null);
   const { pads, error, editable, add, remove } = useCustomBoard(roomId ?? "");
 
+  const showAll = isFullyExpanded || editMode;
   const filteredReactionSet = useMemo(
-    () => (isFullyExpanded ? ReactionSet : ReactionSet.slice(0, 5)),
-    [isFullyExpanded],
+    () => (showAll ? ReactionSet : ReactionSet.slice(0, ReactionsRowSize)),
+    [showAll],
   );
   const customReactions = useMemo(
     () =>
@@ -223,42 +224,43 @@ export function ReactionPopupMenu({
                 </Tooltip>
               </li>
             ))}
-            {customReactions.map((reaction) => (
-              <li
-                key={`custom-${reaction.padId}`}
-                className={styles.customReaction}
-              >
-                <Tooltip label={reaction.name}>
-                  <CpdButton
-                    kind="secondary"
-                    className={styles.reactionButton}
-                    disabled={editMode ? false : !canReact}
-                    onClick={() =>
-                      editMode
-                        ? setPendingDelete(reaction)
-                        : sendReaction(reaction)
-                    }
-                    data-testid={`custom-pad-${reaction.padId}`}
-                  >
-                    {reaction.emoji}
-                  </CpdButton>
-                </Tooltip>
-                {editMode && (
-                  <button
-                    type="button"
-                    className={styles.deleteOverlay}
-                    aria-label={t("action.delete_sound", {
-                      name: reaction.name,
-                    })}
-                    onClick={() => setPendingDelete(reaction)}
-                    data-testid={`delete-custom-${reaction.padId}`}
-                  >
-                    <CloseIcon aria-hidden />
-                  </button>
-                )}
-              </li>
-            ))}
-            {editable && (
+            {showAll &&
+              customReactions.map((reaction) => (
+                <li
+                  key={`custom-${reaction.padId}`}
+                  className={styles.customReaction}
+                >
+                  <Tooltip label={reaction.name}>
+                    <CpdButton
+                      kind="secondary"
+                      className={styles.reactionButton}
+                      disabled={editMode ? false : !canReact}
+                      onClick={() =>
+                        editMode
+                          ? setPendingDelete(reaction)
+                          : sendReaction(reaction)
+                      }
+                      data-testid={`custom-pad-${reaction.padId}`}
+                    >
+                      {reaction.emoji}
+                    </CpdButton>
+                  </Tooltip>
+                  {editMode && (
+                    <button
+                      type="button"
+                      className={styles.deleteOverlay}
+                      aria-label={t("action.delete_sound", {
+                        name: reaction.name,
+                      })}
+                      onClick={() => setPendingDelete(reaction)}
+                      data-testid={`delete-custom-${reaction.padId}`}
+                    >
+                      <CloseIcon aria-hidden />
+                    </button>
+                  )}
+                </li>
+              ))}
+            {showAll && editable && (
               <li>
                 <Tooltip label={t("action.add_sound")}>
                   <CpdButton

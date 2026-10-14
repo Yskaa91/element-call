@@ -78,6 +78,35 @@ test("no delete overlay before edit mode", () => {
   expect(queryByTestId("delete-custom-pad1")).toBeNull();
 });
 
+test("collapsed menu hides custom pads and the add button", () => {
+  const { queryByTestId, queryByLabelText } = renderMenu();
+  expect(queryByTestId("custom-pad-pad1")).toBeNull();
+  expect(queryByLabelText("Add sound")).toBeNull();
+});
+
+test("expanded menu shows built-ins first, then custom pads, then add last", async () => {
+  const user = userEvent.setup();
+  const { getByLabelText, getByTestId, container } = renderMenu();
+  await user.click(getByLabelText("Show more"));
+  const pad = getByTestId("custom-pad-pad1");
+  expect(pad).toBeDefined();
+  const addButton = getByLabelText("Add sound");
+  const items = [...container.querySelectorAll("menu li")];
+  const padIndex = items.findIndex((li) => li.contains(pad));
+  const addIndex = items.findIndex((li) => li.contains(addButton));
+  expect(padIndex).toBeGreaterThanOrEqual(0);
+  expect(addIndex).toBe(items.length - 1);
+  expect(padIndex).toBeLessThan(addIndex);
+});
+
+test("entering edit mode forces the expanded view", async () => {
+  const user = userEvent.setup();
+  const { getByLabelText, getByTestId } = renderMenu();
+  await user.click(getByLabelText("Edit sounds"));
+  expect(getByTestId("custom-pad-pad1")).toBeDefined();
+  expect(getByLabelText("Add sound")).toBeDefined();
+});
+
 test("edit mode shows delete overlay; clicking pad opens confirm and does not send", async () => {
   const user = userEvent.setup();
   const {
@@ -98,7 +127,8 @@ test("edit mode shows delete overlay; clicking pad opens confirm and does not se
 
 test("clicking custom pad outside edit mode sends the reaction", async () => {
   const user = userEvent.setup();
-  const { getByTestId, sendReaction } = renderMenu();
+  const { getByLabelText, getByTestId, sendReaction } = renderMenu();
+  await user.click(getByLabelText("Show more"));
   await user.click(getByTestId("custom-pad-pad1"));
   expect(sendReaction).toHaveBeenCalledTimes(1);
   expect(sendReaction.mock.calls[0][0]).toMatchObject({ padId: "pad1" });

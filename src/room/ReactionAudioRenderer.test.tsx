@@ -30,6 +30,12 @@ import { GenericReaction, ReactionSet } from "../reactions";
 import { prefetchSounds } from "../soundUtils";
 import { type CallViewModel } from "../state/CallViewModel/CallViewModel";
 import { getBasicCallViewModelEnvironment } from "../utils/test-viewmodel";
+import { HostBridgeProvider, nullHostBridge } from "../HostBridge";
+import { useCustomBoard } from "../swag/reactions/useCustomBoard";
+import {
+  fetchCustomSounds,
+  resolveCustomSound,
+} from "../swag/reactions/customSoundCache";
 import {
   alice,
   aliceRtcMember,
@@ -51,6 +57,22 @@ function TestComponent({ vm }: { vm: CallViewModel }): ReactNode {
 vitest.mock("livekit-client/e2ee-worker?worker");
 vitest.mock("../useAudioContext");
 vitest.mock("../soundUtils");
+vitest.mock("../swag/reactions/useCustomBoard", () => ({
+  useCustomBoard: vitest.fn(() => ({
+    pads: [],
+    error: null,
+    editable: false,
+    add: vitest.fn(),
+    remove: vitest.fn(),
+  })),
+}));
+vitest.mock("../swag/reactions/customSoundCache", () => ({
+  fetchCustomSounds: vitest.fn(async () => {
+    await Promise.resolve();
+    return {};
+  }),
+  resolveCustomSound: vitest.fn(() => undefined),
+}));
 
 let playSound: Mock<
   NonNullable<ReturnType<typeof useAudioContext>>["playSound"]
@@ -172,5 +194,79 @@ describe("ReactionAudioRenderer", () => {
     });
     expect(playSound).toHaveBeenCalledWith(reaction1.name);
     expect(playSound).toHaveBeenCalledWith(reaction2.name);
+  });
+
+  it("fetches custom pad sounds once without looping the audio engine", async () => {
+    (useAudioContext as MockedFunction<typeof useAudioContext>).mockClear();
+    (fetchCustomSounds as MockedFunction<typeof fetchCustomSounds>).mockClear();
+    const pad = {
+      id: "pad1",
+      name: "Horn",
+      emoji: "📯",
+      mxc: "mxc://example/horn",
+      mimetype: "audio/ogg",
+      size: 1000,
+      durationMs: 1000,
+      addedBy: "@alice:example.org",
+      addedTs: 0,
+    };
+    (useCustomBoard as MockedFunction<typeof useCustomBoard>).mockReturnValue({
+      pads: [pad],
+      error: null,
+      editable: true,
+      add: vitest.fn(),
+      remove: vitest.fn(),
+    });
+    (
+      fetchCustomSounds as MockedFunction<typeof fetchCustomSounds>
+    ).mockResolvedValue({ Horn: new ArrayBuffer(8) });
+    (
+      resolveCustomSound as MockedFunction<typeof resolveCustomSound>
+    ).mockReturnValue(pad);
+    const { vm } = getBasicCallViewModelEnvironment([local, alice]);
+    playReactionsSoundSetting.setValue(true);
+    const downloadMedia = vitest.fn(async () => {
+      await Promise.resolve();
+      return new Blob([]);
+    });
+    const { unmount } = render(
+      <HostBridgeProvider value={{ ...nullHostBridge, downloadMedia }}>
+        <TooltipProvider>
+          <ReactionsAudioRenderer vm={vm} roomId="!room:example.org" />
+        </TooltipProvider>
+      </HostBridgeProvider>,
+    );
+    // Plain waits, not act(): on the buggy code the merge effect reschedules
+    // itself forever, so an act() scope never settles and times out. Plain
+    // waits let the loop iterate a few times in the background instead.
+    for (let i = 0; i < 5; i++) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    }
+    const settledCalls = (
+      useAudioContext as MockedFunction<typeof useAudioContext>
+    ).mock.calls.length;
+    // If the merge loop were still present, renders would keep coming.
+    for (let i = 0; i < 5; i++) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    }
+    const audioCalls = (
+      useAudioContext as MockedFunction<typeof useAudioContext>
+    ).mock.calls.length;
+    const soundsIdentities = new Set<unknown>();
+    for (const call of (
+      useAudioContext as MockedFunction<typeof useAudioContext>
+    ).mock.calls) {
+      soundsIdentities.add(call[0].sounds);
+    }
+    unmount();
+    expect(fetchCustomSounds).toHaveBeenCalledTimes(1);
+    expect(audioCalls).toBe(settledCalls);
+    // null, then bundled, then bundled+customs: the only transitions allowed.
+    expect(soundsIdentities.size).toBeLessThanOrEqual(3);
+    expect(audioCalls).toBeLessThanOrEqual(4);
   });
 });

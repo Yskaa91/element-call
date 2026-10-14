@@ -5,7 +5,14 @@ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE in the repository root for full details.
 */
 
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { playReactionsSound, useSetting } from "../settings/settings";
 import { GenericReaction, ReactionSet } from "../reactions";
@@ -39,13 +46,26 @@ export function ReactionsAudioRenderer({
   roomId?: string;
 }): ReactNode {
   const [shouldPlay] = useSetting(playReactionsSound);
-  const [soundCache, setSoundCache] = useState<ReturnType<
+  const [bundledCache, setBundledCache] = useState<ReturnType<
     typeof prefetchSounds
+  > | null>(null);
+  const [customCache, setCustomCache] = useState<Record<
+    string,
+    ArrayBuffer
   > | null>(null);
   const hostBridge = useHostBridge();
   const { pads } = useCustomBoard(roomId ?? "");
+  // The combined promise identity must stay stable across renders: it feeds
+  // `useAudioContext`, which rebuilds the AudioContext whenever it changes.
+  const sounds = useMemo((): Promise<Record<string, ArrayBuffer>> | null => {
+    if (bundledCache === null) return null;
+    if (customCache === null) return bundledCache;
+    return Promise.all([bundledCache, Promise.resolve(customCache)]).then(
+      ([bundled, customs]) => ({ ...bundled, ...customs }),
+    );
+  }, [bundledCache, customCache]);
   const audioEngineCtx = useAudioContext({
-    sounds: soundCache,
+    sounds,
     latencyHint: "interactive",
     muted,
   });
@@ -58,32 +78,43 @@ export function ReactionsAudioRenderer({
   );
 
   useEffect(() => {
-    if (!shouldPlay || soundCache) {
+    if (!shouldPlay || bundledCache) {
       return;
     }
     // This is fine even if we load the component multiple times,
     // as the browser's cache should ensure once the media is loaded
     // once that future fetches come via the cache.
-    setSoundCache(prefetchSounds(soundMap));
-  }, [soundCache, shouldPlay]);
+    setBundledCache(prefetchSounds(soundMap));
+  }, [bundledCache, shouldPlay]);
 
-  // Custom board pads arrive after the bundled prefetch: merge their buffers
-  // into a fresh promise so the engine rebuilds with every name playable.
+  // Custom board pads merge into their own cache, never into the state this
+  // effect depends on: setting the same promise state the effect reads back
+  // retriggers the effect forever and rebuilds the AudioContext each pass.
   // Unknown names still fall back to the generic sound below.
+  const fetchedPadsKey = useRef("");
   useEffect(() => {
-    if (!shouldPlay || !soundCache || pads.length === 0) return;
+    if (!shouldPlay) return;
     if (!hostBridge.downloadMedia) return;
+    const key = pads
+      .map((pad) => pad.mxc)
+      .sort()
+      .join("\n");
+    if (key === fetchedPadsKey.current) return;
+    fetchedPadsKey.current = key;
+    if (pads.length === 0) {
+      setCustomCache(null);
+      return;
+    }
     let cancelled = false;
     void (async (): Promise<void> => {
       const customs = await fetchCustomSounds(download, pads);
-      if (cancelled || Object.keys(customs).length === 0) return;
-      const bundled = await soundCache;
-      setSoundCache(Promise.resolve({ ...bundled, ...customs }));
+      if (cancelled || fetchedPadsKey.current !== key) return;
+      setCustomCache(customs);
     })();
     return (): void => {
       cancelled = true;
     };
-  }, [shouldPlay, soundCache, pads, download, hostBridge]);
+  }, [shouldPlay, pads, download, hostBridge]);
 
   useEffect(() => {
     const sub = vm.audibleReactions$.subscribe((newReactions) => {
