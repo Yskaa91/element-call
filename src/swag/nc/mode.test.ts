@@ -44,9 +44,15 @@ afterEach(() => {
 });
 
 describe("isNoiseCancellationMode", () => {
-  it("accepts the three mode literals", () => {
-    expect(NOISE_CANCELLATION_MODES).toEqual(["browser", "gtcrn", "off"]);
+  it("accepts the four mode literals", () => {
+    expect(NOISE_CANCELLATION_MODES).toEqual([
+      "deepfilternet",
+      "browser",
+      "gtcrn",
+      "off",
+    ]);
     expect(NOISE_CANCELLATION_MODES.map(isNoiseCancellationMode)).toEqual([
+      true,
       true,
       true,
       true,
@@ -65,33 +71,59 @@ describe("isNoiseCancellationMode", () => {
 
 describe("readNoiseCancellationMode", () => {
   it("returns a valid stored value", async () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify("gtcrn"));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify("deepfilternet"));
     const { readNoiseCancellationMode } = await importMode();
-    expect(readNoiseCancellationMode()).toBe("gtcrn");
+    expect(readNoiseCancellationMode()).toBe("deepfilternet");
+  });
+
+  it("keeps explicitly stored legacy values working", async () => {
+    for (const mode of ["browser", "gtcrn", "off"] as const) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mode));
+      const { readNoiseCancellationMode } = await importMode();
+      expect(readNoiseCancellationMode()).toBe(mode);
+    }
   });
 
   it("falls back to the default for an unknown or drifted stored value", async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify("nope"));
     const { readNoiseCancellationMode } = await importMode();
-    expect(readNoiseCancellationMode()).toBe("gtcrn");
+    expect(readNoiseCancellationMode()).toBe("deepfilternet");
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify("gtcrn "));
     const { readNoiseCancellationMode: readDrifted } = await importMode();
-    expect(readDrifted()).toBe("gtcrn");
+    expect(readDrifted()).toBe("deepfilternet");
   });
 
   it("falls back to the default for a hostile stored value", async () => {
     localStorage.setItem(STORAGE_KEY, "not json");
     const { readNoiseCancellationMode } = await importMode();
-    expect(readNoiseCancellationMode()).toBe("gtcrn");
+    expect(readNoiseCancellationMode()).toBe("deepfilternet");
   });
 });
 
 describe("micProcessingOptions", () => {
   const cases: [NoiseCancellationMode, typeof allOn, typeof allOn][] = [
+    [
+      "deepfilternet",
+      allOn,
+      {
+        echoCancellation: true,
+        noiseSuppression: false,
+        autoGainControl: true,
+      },
+    ],
+    ["deepfilternet", allOff, allOff],
     ["browser", allOn, allOn],
     ["browser", allOff, allOff],
-    ["gtcrn", allOn, { echoCancellation: true, noiseSuppression: false, autoGainControl: true }],
+    [
+      "gtcrn",
+      allOn,
+      {
+        echoCancellation: true,
+        noiseSuppression: false,
+        autoGainControl: true,
+      },
+    ],
     ["gtcrn", allOff, allOff],
     ["off", allOn, allOff],
     ["off", allOff, allOff],

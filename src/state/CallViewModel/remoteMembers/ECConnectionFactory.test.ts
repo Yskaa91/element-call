@@ -32,6 +32,7 @@ import {
   cameraBitrate,
   cameraCodec,
 } from "../../../settings/settings.ts";
+import { noiseCancellationSetting } from "../../../swag/nc/mode.ts";
 
 // At the top of your test file, after imports
 vi.mock("livekit-client", async (importOriginal) => {
@@ -72,7 +73,8 @@ describe("ECConnectionFactory - Audio inputs options", () => {
     ({ echo, noise }) => {
       const RoomConstructor = vi.mocked(LivekitRoom);
 
-      // Set audio processing settings
+      // Set audio processing settings (browser mode passes toggles through)
+      noiseCancellationSetting.setValue("browser");
       echoCancellationSetting.setValue(echo);
       noiseSuppressionSetting.setValue(noise);
 
@@ -105,6 +107,41 @@ describe("ECConnectionFactory - Audio inputs options", () => {
       );
     },
   );
+
+  test("the deepfilternet default replaces browser noise suppression", () => {
+    const RoomConstructor = vi.mocked(LivekitRoom);
+
+    noiseCancellationSetting.setValue("deepfilternet");
+    echoCancellationSetting.setValue(true);
+    noiseSuppressionSetting.setValue(true);
+
+    const ecConnectionFactory = new ECConnectionFactory(
+      mockClient,
+      "!roomid:example.org",
+      mockMediaDevices({}),
+      new BehaviorSubject<ProcessorState>({
+        supported: true,
+        processor: undefined,
+      }),
+      undefined,
+      false,
+    );
+    ecConnectionFactory.createConnection(
+      testScope,
+      exampleTransport,
+      ownMemberMock,
+      logger,
+    );
+
+    expect(RoomConstructor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audioCaptureDefaults: expect.objectContaining({
+          echoCancellation: true,
+          noiseSuppression: false,
+        }),
+      }),
+    );
+  });
 });
 
 describe("ECConnectionFactory - ControlledAudioDevice", () => {

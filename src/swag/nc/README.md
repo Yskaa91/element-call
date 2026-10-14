@@ -1,8 +1,42 @@
 # Noise cancellation (swag)
 
-Splices a vendored GTCRN denoiser worklet into the call's microphone graph.
+Default: DeepFilterNet3 (`deepfilternet`), via `@workadventure/noise-suppression`
+pinned to `0.2.0` in devDependencies (everything is bundled, matching this
+repo's pattern). The package is MIT; the DeepFilterNet model upstream is
+MIT/Apache-2.0.
 
-## Vendored assets
+Only the `/deepfilternet` entrypoint is ever imported, and only through a
+dynamic `import()` in `src/swag/nc/deepFilterNetProcessor.ts`, so the ~11 MB
+WASM/model stays out of the initial bundle and loads lazily on first use in
+`deepfilternet` mode. The shared Vite plugin config (`vitePluginsConfig` in
+`vite.config.ts`, reused by the embedded/component builds) includes
+`noiseSuppressionAudioWorkletVitePlugin()`, which serves the worklet, WASM and
+model in dev; production builds emit them through Vite's native
+`new URL(..., import.meta.url)` asset handling. The background-noise and DTLN
+entrypoints are never imported.
+
+## DeepFilterNet3 wiring
+
+- `mode.ts`: `NOISE_CANCELLATION_MODES = ["deepfilternet", "browser", "gtcrn", "off"]`,
+  default `deepfilternet`. Explicitly stored `browser`/`gtcrn`/`off` values keep
+  working; only unset/unknown values become the new default.
+  `micProcessingOptions` treats `deepfilternet` like `gtcrn`: browser
+  `noiseSuppression` forced off, echo cancellation and AGC follow the toggles.
+- `deepFilterNetProcessor.ts`: a LiveKit `TrackProcessor` (`swag-deepfilternet3`).
+  Uses the provided `AudioContext` (must be 48 kHz) or creates one, resumes it,
+  connects mic source → worklet → destination, waits for `ready`, and publishes
+  the destination's track. `restart` rebuilds for a new mic track; `destroy`
+  disposes the worklet, disconnects, stops only the processed track, and closes
+  only a self-created context. Never stops the original mic track.
+- `Publisher.ts` (`onLocalTrackPublished`): in `deepfilternet` mode ensures a
+  48 kHz context on the mic track and attaches the processor (async
+  fire-and-forget). On capability/attach failure it logs and falls back to
+  `track.applyConstraints({ noiseSuppression: true })`, so users are never left
+  with no denoiser. Attached processors are destroyed in `stopTracks`/`destroy`.
+- `ConnectionFactory.ts` needs no structural change: `micProcessingOptions`
+  already centralizes the capture toggles.
+
+## Vendored assets (GTCRN, still selectable)
 
 | File | sha256 | Size |
 | ---- | ------ | ---- |

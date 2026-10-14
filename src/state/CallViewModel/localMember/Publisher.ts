@@ -7,11 +7,14 @@ Please see LICENSE in the repository root for full details.
 */
 import {
   ConnectionState as LivekitConnectionState,
+  type LocalAudioTrack,
   type LocalTrackPublication,
   LocalVideoTrack,
   ParticipantEvent,
   type Room as LivekitRoom,
   Track,
+  type TrackProcessor,
+  type AudioProcessorOptions,
 } from "livekit-client";
 import {
   map,
@@ -33,6 +36,11 @@ import {
 import { observeTrackReference$ } from "../../observeTrackReference";
 import { type Connection } from "../remoteMembers/Connection.ts";
 import { ObservableScope } from "../../ObservableScope.ts";
+import { readNoiseCancellationMode } from "../../../swag/nc/mode.ts";
+import { createDeepFilterNetProcessor } from "../../../swag/nc/deepFilterNetProcessor.ts";
+
+/** DeepFilterNet3 needs a 48 kHz context; LiveKit has no getter, so we set it. */
+const DEEPFILTERNET_CONTEXT_RATE = 48000;
 
 /**
  * A wrapper for a Connection object.
@@ -48,6 +56,16 @@ export class Publisher {
   public shouldPublish = false;
 
   private readonly scope = new ObservableScope();
+
+  /**
+   * Microphone tracks with an attached DeepFilterNet3 processor, and the
+   * processor to destroy when the track stops. Anything else (browser, gtcrn,
+   * off) never lands here.
+   */
+  private readonly deepFilterNetProcessors = new Map<
+    object,
+    TrackProcessor<Track.Kind.Audio, AudioProcessorOptions>
+  >();
 
   /**
    * Creates a new Publisher.
@@ -138,6 +156,14 @@ export class Publisher {
           });
         }
       }
+      if (
+        readNoiseCancellationMode() === "deepfilternet" &&
+        localTrackPublication.track
+      ) {
+        this.attachDeepFilterNet(
+          localTrackPublication.track as LocalAudioTrack,
+        );
+      }
     } else if (localTrackPublication.source === Track.Source.Camera) {
       const muteState = this.muteStates.video;
       // skip this if a sync is in progress: enabled$ still reflects the old
@@ -156,6 +182,54 @@ export class Publisher {
             );
           });
         }
+      }
+    }
+  }
+  /**
+   * Attaches the DeepFilterNet3 denoiser to a published microphone track.
+   *
+   * Fire-and-forget: `setProcessor` needs a 48 kHz AudioContext on the track
+   * first, and either step can reject on an unsupported browser — in which
+   * case browser noise suppression is re-enabled so the user is never left
+   * with no denoiser. Behavior is unchanged for `browser`, `gtcrn` and `off`.
+   */
+  private attachDeepFilterNet(track: LocalAudioTrack): void {
+    if (this.deepFilterNetProcessors.has(track)) return;
+    const processor = createDeepFilterNetProcessor();
+    this.deepFilterNetProcessors.set(track, processor);
+    void (async (): Promise<void> => {
+      try {
+        track.setAudioContext(
+          new AudioContext({ sampleRate: DEEPFILTERNET_CONTEXT_RATE }),
+        );
+        await track.setProcessor(processor);
+      } catch (e) {
+        this.deepFilterNetProcessors.delete(track);
+        this.logger.error(
+          "Failed to attach DeepFilterNet3 noise suppression, falling back to browser noise suppression",
+          e,
+        );
+        try {
+          await track.applyConstraints({ noiseSuppression: true });
+        } catch (fallbackError) {
+          this.logger.error(
+            "Failed to fall back to browser noise suppression",
+            fallbackError,
+          );
+        }
+      }
+    })();
+  }
+
+  /** Destroys every attached DeepFilterNet3 processor. Never throws. */
+  private async destroyDeepFilterNetProcessors(): Promise<void> {
+    const processors = [...this.deepFilterNetProcessors.values()];
+    this.deepFilterNetProcessors.clear();
+    for (const processor of processors) {
+      try {
+        await processor.destroy();
+      } catch (e) {
+        this.logger.error("Failed to destroy the DeepFilterNet3 processor", e);
       }
     }
   }
@@ -280,6 +354,7 @@ export class Publisher {
   }
 
   public async stopTracks(): Promise<void> {
+    await this.destroyDeepFilterNetProcessors();
     const lkRoom = this.connection.livekitRoom;
     for (const source of [
       Track.Source.Microphone,

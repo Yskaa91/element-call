@@ -56,6 +56,7 @@ export const NoiseCancellationSettings: FC = () => {
     switch (mode) {
       case "browser":
         return false;
+      case "deepfilternet":
       case "gtcrn":
         return toggle === "noiseSuppression";
       case "off":
@@ -69,12 +70,20 @@ export const NoiseCancellationSettings: FC = () => {
   );
 
   const modeLabels: Record<NoiseCancellationMode, string> = {
-    browser: t("settings.noise_cancellation_mode_browser", "Browser (default)"),
+    deepfilternet: t(
+      "settings.noise_cancellation_mode_deepfilternet",
+      "Enhanced (DeepFilterNet3, default)",
+    ),
+    browser: t("settings.noise_cancellation_mode_browser", "Browser"),
     gtcrn: t("settings.noise_cancellation_mode_gtcrn", "Enhanced (GTCRN)"),
     off: t("settings.noise_cancellation_mode_off", "Off"),
   };
 
   const modeDescriptions: Record<NoiseCancellationMode, string> = {
+    deepfilternet: t(
+      "settings.noise_cancellation_mode_deepfilternet_description",
+      "Replaces browser noise suppression with the DeepFilterNet3 denoiser. Echo cancellation and automatic gain control still follow the toggles below.",
+    ),
     browser: t(
       "settings.noise_cancellation_mode_browser_description",
       "Uses your browser's built-in echo cancellation, noise suppression, and automatic gain control. The toggles below still apply.",

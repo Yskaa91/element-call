@@ -16,10 +16,7 @@ import {
   echoCancellationSetting,
   noiseSuppressionSetting,
 } from "../../settings/settings";
-import {
-  NOISE_CANCELLATION_MODES,
-  noiseCancellationSetting,
-} from "./mode";
+import { NOISE_CANCELLATION_MODES, noiseCancellationSetting } from "./mode";
 
 function renderSettings(): void {
   render(
@@ -39,7 +36,7 @@ describe("NoiseCancellationSettings", () => {
     autoGainControlSetting.setValue(true);
   });
 
-  it("renders the three mode options", () => {
+  it("renders the four mode options", () => {
     renderSettings();
     for (const mode of NOISE_CANCELLATION_MODES) {
       expect(screen.getByDisplayValue(mode)).toBeInTheDocument();
@@ -86,6 +83,17 @@ describe("NoiseCancellationSettings", () => {
   });
 
   describe("toggle disabled state", () => {
+    it("disables only noise suppression in deepfilternet mode", () => {
+      noiseCancellationSetting.setValue("deepfilternet");
+      renderSettings();
+      expect(screen.getByLabelText("Noise suppression")).toBeDisabled();
+      expect(screen.getByLabelText("Echo cancellation")).toBeEnabled();
+      expect(screen.getByLabelText("Automatic gain control")).toBeEnabled();
+      expect(
+        screen.getByText("Disabled by the selected mode."),
+      ).toBeInTheDocument();
+    });
+
     it("disables only noise suppression in gtcrn mode", () => {
       noiseCancellationSetting.setValue("gtcrn");
       renderSettings();

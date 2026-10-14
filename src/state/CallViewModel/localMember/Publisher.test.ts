@@ -8,6 +8,7 @@ Please see LICENSE in the repository root for full details.
 import { afterEach, beforeEach, describe, expect, it, test, vi } from "vitest";
 import {
   ConnectionState as LivekitConnectionState,
+  type LocalAudioTrack,
   LocalParticipant,
   type LocalTrack,
   type LocalTrackPublication,
@@ -27,6 +28,21 @@ import {
 import { Publisher } from "./Publisher";
 import { type Connection } from "../remoteMembers/Connection";
 import { type MuteStates } from "../../MuteStates";
+
+const { mockReadNoiseCancellationMode, mockCreateDeepFilterNetProcessor } =
+  vi.hoisted(() => ({
+    mockReadNoiseCancellationMode: vi.fn(() => "browser"),
+    mockCreateDeepFilterNetProcessor: vi.fn(),
+  }));
+
+vi.mock("../../../swag/nc/mode", async (importOriginal) => ({
+  ...((await importOriginal()) as object),
+  readNoiseCancellationMode: mockReadNoiseCancellationMode,
+}));
+
+vi.mock("../../../swag/nc/deepFilterNetProcessor", () => ({
+  createDeepFilterNetProcessor: mockCreateDeepFilterNetProcessor,
+}));
 
 let scope: ObservableScope;
 
@@ -56,6 +72,14 @@ function createMockLocalTrack(source: Track.Source): LocalTrack {
   vi.mocked(track).resumeUpstream = vi.fn().mockImplementation(() => {
     // @ts-expect-error - for that test we want to set isUpstreamPaused directly
     track.isUpstreamPaused = false;
+  });
+  const audioTrack = track as unknown as LocalAudioTrack;
+  vi.mocked(audioTrack).setAudioContext = vi.fn();
+  vi.mocked(audioTrack).setProcessor = vi.fn(async () => {
+    await Promise.resolve();
+  });
+  vi.mocked(audioTrack).applyConstraints = vi.fn(async () => {
+    await Promise.resolve();
   });
 
   return track;
@@ -398,5 +422,108 @@ describe("Bug fix", () => {
       expect(track!.isMuted).toBe(true);
     }
     await publisher.destroy();
+  });
+});
+
+describe("Publisher DeepFilterNet3 noise suppression", () => {
+  let publisher: Publisher;
+
+  beforeEach(() => {
+    mockReadNoiseCancellationMode.mockClear();
+    mockCreateDeepFilterNetProcessor.mockClear();
+    mockReadNoiseCancellationMode.mockReturnValue("browser");
+    mockCreateDeepFilterNetProcessor.mockReturnValue({
+      name: "swag-deepfilternet3",
+      init: vi.fn(),
+      restart: vi.fn(),
+      destroy: vi.fn(async () => {
+        await Promise.resolve();
+      }),
+    });
+    vi.stubGlobal(
+      "AudioContext",
+      class {
+        public sampleRate = 48000;
+        public constructor(_opts?: unknown) {}
+      },
+    );
+    publisher = new Publisher(
+      connection,
+      mockMediaDevices({}),
+      muteStates,
+      constant({ supported: false, processor: undefined }),
+      logger,
+      false,
+    );
+  });
+
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    await publisher.destroy();
+  });
+
+  async function publishMicrophone(): Promise<LocalAudioTrack> {
+    audioEnabled$.next(true);
+    await publisher.createAndSetupTracks();
+    await flushPromises();
+    const track = localParticipant.getTrackPublication(Track.Source.Microphone)
+      ?.track as unknown as LocalAudioTrack;
+    expect(track).toBeDefined();
+    return track!;
+  }
+
+  it("attaches the DeepFilterNet processor with a 48 kHz context in deepfilternet mode", async () => {
+    mockReadNoiseCancellationMode.mockReturnValue("deepfilternet");
+
+    const track = await publishMicrophone();
+    await flushPromises();
+
+    expect(mockCreateDeepFilterNetProcessor).toHaveBeenCalledTimes(1);
+    const processor = mockCreateDeepFilterNetProcessor.mock.results[0].value;
+    expect(track.setAudioContext).toHaveBeenCalledWith(
+      expect.objectContaining({ sampleRate: 48000 }),
+    );
+    expect(track.setProcessor).toHaveBeenCalledWith(processor);
+  });
+
+  it.each(["browser", "off"] as const)(
+    "does not attach any processor in %s mode",
+    async (mode) => {
+      mockReadNoiseCancellationMode.mockReturnValue(mode);
+      const track = await publishMicrophone();
+      await flushPromises();
+
+      expect(mockCreateDeepFilterNetProcessor).not.toHaveBeenCalled();
+      expect(track.setProcessor).not.toHaveBeenCalled();
+    },
+  );
+
+  it("falls back to browser noise suppression when the processor rejects", async () => {
+    // Publish first in browser mode (no attach), then switch modes and fail
+    // the attach: the rejection must leave browser denoising on.
+    const track = await publishMicrophone();
+    mockReadNoiseCancellationMode.mockReturnValue("deepfilternet");
+    vi.mocked(track.setProcessor).mockRejectedValueOnce(new Error("no wasm"));
+    const publication = localParticipant.getTrackPublication(
+      Track.Source.Microphone,
+    );
+    expect(publication).toBeDefined();
+    localParticipant.emit(ParticipantEvent.LocalTrackPublished, publication!);
+    await flushPromises();
+
+    expect(track.applyConstraints).toHaveBeenCalledWith({
+      noiseSuppression: true,
+    });
+  });
+
+  it("destroys the attached processor on stop/destroy", async () => {
+    mockReadNoiseCancellationMode.mockReturnValue("deepfilternet");
+
+    await publishMicrophone();
+    await flushPromises();
+    const processor = mockCreateDeepFilterNetProcessor.mock.results[0].value;
+    await publisher.destroy();
+
+    expect(processor.destroy).toHaveBeenCalled();
   });
 });

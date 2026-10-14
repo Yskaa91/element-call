@@ -17,6 +17,7 @@ import { createHtmlPlugin } from "vite-plugin-html";
 
 import { codecovVitePlugin } from "@codecov/vite-plugin";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { noiseSuppressionAudioWorkletVitePlugin } from "@workadventure/noise-suppression/vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import wasm from "vite-plugin-wasm";
 import babel from "@rolldown/plugin-babel";
@@ -58,6 +59,13 @@ export const vitePluginsConfig = ({
       bundleName: "element-call",
       uploadToken: process.env.CODECOV_TOKEN,
     }),
+    // Serves the DeepFilterNet3 worklet/WASM/model from
+    // @workadventure/noise-suppression in dev; production builds emit them
+    // through Vite's native new URL(..., import.meta.url) asset handling.
+    // Only the /deepfilternet entrypoint is ever imported (dynamically, in
+    // src/swag/nc/deepFilterNetProcessor.ts), so the model stays out of the
+    // initial bundle.
+    noiseSuppressionAudioWorkletVitePlugin(),
   ];
 
   if (

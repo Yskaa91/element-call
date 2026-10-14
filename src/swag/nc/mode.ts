@@ -7,13 +7,18 @@ Please see LICENSE in the repository root for full details.
 
 import { Setting } from "../../settings/settings.ts";
 
-export const NOISE_CANCELLATION_MODES = ["browser", "gtcrn", "off"] as const;
+export const NOISE_CANCELLATION_MODES = [
+  "deepfilternet",
+  "browser",
+  "gtcrn",
+  "off",
+] as const;
 
 export type NoiseCancellationMode = (typeof NOISE_CANCELLATION_MODES)[number];
 
 export const noiseCancellationSetting = new Setting<NoiseCancellationMode>(
   "noise-cancellation-mode",
-  "gtcrn",
+  "deepfilternet",
 );
 
 export function isNoiseCancellationMode(
@@ -31,7 +36,7 @@ export function isNoiseCancellationMode(
  */
 export function readNoiseCancellationMode(): NoiseCancellationMode {
   const value: unknown = noiseCancellationSetting.getValue();
-  return isNoiseCancellationMode(value) ? value : "gtcrn";
+  return isNoiseCancellationMode(value) ? value : "deepfilternet";
 }
 
 export interface MicProcessingToggles {
@@ -42,8 +47,8 @@ export interface MicProcessingToggles {
 
 /**
  * The contract the settings-UI copy describes: `browser` keeps the three
- * toggles, `gtcrn` replaces browser noise suppression with the GTCRN stage,
- * `off` disables all browser processing.
+ * toggles, `deepfilternet` and `gtcrn` replace browser noise suppression with
+ * their denoiser stage, `off` disables all browser processing.
  */
 export function micProcessingOptions(
   mode: NoiseCancellationMode,
@@ -52,6 +57,7 @@ export function micProcessingOptions(
   switch (mode) {
     case "browser":
       return { ...toggles };
+    case "deepfilternet":
     case "gtcrn":
       return { ...toggles, noiseSuppression: false };
     case "off":
